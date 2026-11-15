@@ -314,10 +314,11 @@
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); html = viewBots(); }
     else if (S.tab === "activity") html = viewActivity();
     else if (S.tab === "account") { ensure("account"); ensure("settings"); html = viewAccount(); }
-    const balEl = $("#bal"), keepBal = balEl && balEl.dataset.v;
+    const oldBal = $("#bal");     // keep the odometer node across renders so changed digits roll
     view.innerHTML = html;
+    const newBal = $("#bal"); if (oldBal && newBal && oldBal.dataset.v) newBal.replaceWith(oldBal);
     if (key === lastHtmlKey && fromPoll) scrollTo(0, y); lastHtmlKey = key;
-    after(keepBal);
+    after();
   }
   function ensure(name) {
     if (!S.ix) { if (S.files[name] === undefined && !S.cached) S.files[name] = undefined; return; }
@@ -328,9 +329,9 @@
     getFile(name).then(() => { S.loadingFile[name] = false; render(); }, () => { S.loadingFile[name] = false; });
   }
   let prevChart = null;
-  function after(keepBal) {
+  function after() {
     const bal = $("#bal");
-    if (bal && S.state) { if (keepBal) bal.dataset.v = keepBal, bal.innerHTML = ""; odo(bal, money(S.state.balance)); }
+    if (bal && S.state) odo(bal, money(S.state.balance));
     const bc = $("#bchart"); if (bc) { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; }
     const top = S.stack[S.stack.length - 1];
     const cc = $("#cchart"); if (cc && top) { const c = S.files["coin/" + top.mint]; if (c) Charts.candles(cc, c.candles, c.exit_line, c.position && c.position.entry_price); }
