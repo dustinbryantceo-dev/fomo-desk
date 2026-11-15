@@ -42,7 +42,7 @@
       try { fxDiff(ix.state, S.files["activity/0"]); } catch {}
       if (ix.files.screen && ix.files.screen !== S.screenVer) loadScreen(ix.files.screen);
     } catch (e) { S.err = e.status === 404 || /no index/.test(e.message) ? "nodata" : "offline"; }
-    if (S.tab === "account" && !S.stack.length) await ctlPoll();
+    if ((S.tab === "account" || S.tab === "home") && !S.stack.length && ctlAuth()) await ctlPoll();
     S.firstTry = false; S.retryAt = Date.now() + POLL_S * 1000;
     render(true);
   }
@@ -167,7 +167,7 @@
   }
   function posCard(p) {
     const pnl = p.value_usd != null && p.size_usd != null ? p.value_usd - p.size_usd : null, upp = (p.change_pct || 0) >= 0;
-    const tags = (p.tp_done ? '<span class="tag tp">TP HIT</span>' : "") + (p.trail_active ? '<span class="tag sell">TRAILING</span>' : "");
+    const tags = (p.starship ? '<span class="tag ss">🚀 STARSHIP</span>' : "") + (p.tp_done ? '<span class="tag tp">TP HIT</span>' : "") + (p.trail_active ? '<span class="tag sell">TRAILING</span>' : "");
     return `<div class="prow ${upp ? "gain" : "loss"}" data-act="coin" data-mint="${esc(p.mint)}">
       <div class="pic">${sym(p.symbol, p.mint).slice(0, 1)}</div>
       <div class="ptx"><div class="psym">${sym(p.symbol, p.mint)} ${tags}</div><div class="psub">${money(p.size_usd)} in · stop ${priceFmt(p.stop_price)}${p.opened_at ? " · " + hm(p.opened_at) : ""}</div></div>
@@ -214,6 +214,7 @@
         </section>
         <section class="a-bots">${botStrip()}</section>
         <section class="a-pos">
+          ${canCtl() ? ssHomeCard() : ""}
           <h2 class="sec">Open positions <span class="count">· ${pos.length}</span></h2>
           ${S.demo ? `<div class="plist">${demoRow()}</div>` : ""}
           ${pos.length ? `<div class="plist">${pos.map(posCard).join("")}</div>` : S.demo ? "" : '<div class="empty glass"><b>No open positions</b>Risk is watching for the next entry.</div>'}
@@ -558,6 +559,7 @@
       </div>
       ${canCtl() ? `<div class="grp">Control</div><div class="list plain">
         <button class="row" data-act="settingsv" style="width:100%;text-align:left"><div class="tx"><div class="t1">Settings</div><div class="t2">Stop, take profit, trail, sizes… same as /set, with confirm</div></div><span class="ter">›</span></button>
+        <button class="row ssrow" data-act="starship" style="width:100%;text-align:left"><span class="ssico">🚀</span><div class="tx"><div class="t1">Starship Mode</div><div class="t2">${ssAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window &amp; buy timer</div><div class="t2">${winAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="bots" style="width:100%;text-align:left"><div class="tx"><div class="t1">Pause / resume bots</div><div class="t2">${pausedNow().size ? "Paused: " + esc([...pausedNow()].join(", ")) : "All running"}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite · copy traders on/off · withdraw</div></div><span class="ter">›</span></button>
@@ -615,6 +617,7 @@
     else if (top && top.kind === "social") { ensure("account"); html = viewSocial(); }
     else if (top && top.kind === "notif") html = viewNotif();
     else if (top && top.kind === "window") html = viewWindow();
+    else if (top && top.kind === "starship") html = viewStarship();
     else if (S.tab === "home") html = viewHome();
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); html = viewBots(); }
     else if (S.tab === "activity") html = viewActivity();
@@ -668,6 +671,10 @@
     else if (act === "wcancel") winCancel();
     else if (act === "wtoggle") winToggle();
     else if (act === "wsave") winSave();
+    else if (act === "starship") { push({ kind: "starship" }); loadStarship(); loadSettings(true); }
+    else if (act === "sstoggle") ssToggle();
+    else if (act === "sscap") ssCap();
+    else if (act === "ssfor") ssLaunch(t.dataset.h === "c" ? "c" : t.dataset.h === "0" ? null : +t.dataset.h);
     else if (act === "report") openReport();
     else if (act === "settingsv") { push({ kind: "settings" }); loadSettings(true); }
     else if (act === "setkey") openSet(t.dataset.k);
@@ -978,6 +985,111 @@
     setMsg(apiText(r.j), ""); confirmStep(p.pid, `Confirm: ${p.new} Rome time`, "red", (j, ok) => { if (ok) winDone(j); });
   }
 
+  // ---- 🚀 STARSHIP MODE (2026-11-15). Same Telegram handler: /starship on | off | for 2h. Ships OFF; only Dustin turns it
+  // on, through the confirm sheet (LIVE = a real-money warning). Settings edit through the normal /set confirm (openSet).
+  async function loadStarship() {
+    const r = await api("/api/starship"); S.ssErr = r.status === 200 ? null : apiErr(r);
+    if (r.status === 200 && r.j.starship) ssSet(r.j.starship);
+    if (S.stack.length && S.stack[S.stack.length - 1].kind === "starship") render(true);
+  }
+  function ssSet(x) { S.ss = x; S.ss._skew = Date.now() / 1000 - (x.server_ts || Date.now() / 1000); }
+  const ssNow = () => Date.now() / 1000 - ((S.ss && S.ss._skew) || 0);
+  function ssState() { const c = (S.ctl.s || {}).starship; return S.ss ? { enabled: S.ss.enabled, until_ts: S.ss.until_ts } : c || null; }
+  function ssAccountLine() {
+    const x = ssState(); if (!x) return "Riskier sniper mode · OFF by default";
+    return x.enabled ? `ON${x.until_ts ? " · until " + romeHM(x.until_ts) + " Rome" : " · no timer"} · half size, tight stop` : "OFF · riskier sniper mode for more trades";
+  }
+  function ssHomeCard() {
+    const x = ssState();
+    if (!x) { if (!S.ssAsked && ctlAuth()) { S.ssAsked = true; ctlPoll().then(() => { if (S.tab === "home") render(true); }); } return ""; }
+    if (!x.enabled) return `<button class="sshome off" data-act="starship"><span class="ssico">🚀</span><div class="tx"><div class="t1">Starship Mode <span class="sspill">OFF</span></div><div class="t2">Riskier sniper mode · tap to see it</div></div><span class="ter">›</span></button>`;
+    return `<button class="sshome on" data-act="starship"><span class="ssico lift">🚀</span><div class="tx"><div class="t1">Starship Mode <span class="sspill on">ON</span></div><div class="t2">${x.until_ts ? `Lands in <b data-sscd="${x.until_ts}">${fmtLeft(x.until_ts - ssNow())}</b> · ${romeHM(x.until_ts)} Rome` : "No timer · until you land it"}${curMode() === "LIVE" ? " · LIVE real money" : ""}</div></div><span class="ter">›</span></button>`;
+  }
+  function ssPnl(st) {
+    const wr = (a) => a.win_rate == null ? "–" : Math.round(a.win_rate) + "%", cell = (a) => `<b class="${a.net_usd > 0 ? "up" : a.net_usd < 0 ? "down" : ""}">${signedMoney(a.net_usd)}</b>`;
+    const row = (lab, a, b) => `<tr><th>${lab}</th><td>${a}</td><td>${b}</td></tr>`, s = st.starship, n = st.normal;
+    return `<div class="sspnl glass"><table><thead><tr><th></th><th>🚀 Starship</th><th>Normal</th></tr></thead><tbody>
+      ${row("Trades today", s.today.trades, n.today.trades)}${row("Win rate today", wr(s.today), wr(n.today))}${row("Net P&amp;L today", cell(s.today), cell(n.today))}
+      ${row("Trades all-time", s.all.trades, n.all.trades)}${row("Win rate all-time", wr(s.all), wr(n.all))}${row("Net P&amp;L all-time", cell(s.all), cell(n.all))}
+      </tbody></table><div class="t2">${st.open} Starship position${st.open === 1 ? "" : "s"} open · ${esc(st.mode)} · today = Rome calendar day · win rate on closed trades</div></div>`;
+  }
+  function viewStarship() {
+    const x = S.ss, head = backBar("Account") + `<h1 class="title">🚀 Starship Mode</h1>`;
+    if (!x) return head + (S.ssErr ? `<div class="empty"><b>Can't reach the desk</b>${esc(S.ssErr)}</div>` : sk(150) + sk(120) + sk(200));
+    const p = x.params, nm = x.normal, live = curMode() === "LIVE";
+    const hero = `<div class="sshero ${x.enabled ? "on" : ""}">
+        <div class="ssstars"></div><div class="ssrocket ${x.enabled ? "lift" : ""}">🚀</div>
+        <div class="sshead"><div class="t1">${x.enabled ? "Starship is flying" : "Starship is on the pad"}</div>
+          <div class="t2">${x.enabled ? (x.until_ts ? `Lands at ${romeHM(x.until_ts)} Rome time` : "No timer: until you land it or the daily loss cap") : "OFF · the desk trades normally"}</div></div>
+        <button class="sw ${x.enabled ? "on" : ""} live" data-act="sstoggle" aria-pressed="${!!x.enabled}" aria-label="Starship Mode"><i></i></button>
+        ${x.enabled && x.until_ts ? `<div class="sscd" data-sscd="${x.until_ts}">${fmtLeft(x.until_ts - ssNow())}</div>` : ""}
+        ${x.enabled && x.buy_block ? `<div class="ssblk">No new buys right now: ${esc(x.buy_block)}. Starship waits too.</div>` : ""}
+        <div class="ssbar"><span>Today ${signedMoney(x.day_pnl)}</span><span>loss cap −$${esc(p.day_loss_usd)}</span></div>
+        <div class="ssmeter"><i style="width:${Math.min(100, Math.max(0, -x.day_pnl / p.day_loss_usd * 100))}%"></i></div></div>`;
+    const chip = (h, lab) => `<button class="wchip" data-act="ssfor" data-h="${h}">${esc(lab)}</button>`;
+    const launch = x.enabled ? `<div class="list plain wpick"><div class="row col"><div class="t1">Change the timer</div><div class="wchips">${chip(1, "1h")}${chip(2, "2h")}${chip(4, "4h")}${chip(8, "8h")}${chip(0, "No timer")}${chip("c", "Custom")}</div><div class="t2">Then Starship turns off by itself (survives desk restarts).</div></div></div>`
+      : `<div class="list plain wpick"><div class="row col"><div class="t1">Launch for</div><div class="wchips">${chip(1, "1h")}${chip(2, "2h")}${chip(4, "4h")}${chip(8, "8h")}${chip(0, "No timer")}${chip("c", "Custom")}</div><div class="t2">Then it turns off by itself. You confirm first${live ? "; LIVE = real money" : ""}.</div></div></div>`;
+    const prow = (k, lab, fmt, nfmt) => `<button class="row" data-act="setkey" data-k="starship.${k}" style="width:100%;text-align:left"><div class="tx"><div class="t1">${lab}</div><div class="t2">${nfmt != null ? "normal " + esc(nfmt) : "starship." + k}</div></div><span class="sv">${esc(fmt)}</span><span class="ter">›</span></button>`;
+    const params = `<div class="grp">Exits &amp; size <span class="ter">· tap to change (confirm)</span></div><div class="list plain">
+        ${prow("size_pct", "Size", `${p.size_pct}% of normal`, "100%")}${prow("stop_pct", "Stop loss", `−${p.stop_pct}%`, `−${nm["risk.stop_pct"]}%`)}
+        ${prow("tp_x", "Take profit at", `${p.tp_x}×`, `${nm["executor.tp_x"]}×`)}${prow("tp_sell_pct", "Take profit sells", `${p.tp_sell_pct}%`, `${nm["executor.tp_sell_pct"]}%`)}
+        ${prow("trail_pct", "Trail", `${p.trail_pct}%`, `${nm["executor.trail_pct"]}%`)}${prow("timeout_h", "Dead-money timeout", `${p.timeout_h}h`, `${nm["risk.timeout_h"]}h`)}</div>
+      <div class="grp">Caps</div><div class="list plain">${prow("max_open", "Max open Starship positions", String(p.max_open))}
+        <div class="row qrow sscap"><label>Daily loss cap $ <input id="sscap" type="number" inputmode="decimal" min="1" max="500" step="1" value="${esc(p.day_loss_usd)}"></label><button class="btn sm" data-act="sscap">Save</button></div></div>
+      <div class="p2note">At a realized Starship loss of <b>$${esc(p.day_loss_usd)}</b> in one Rome day, Starship turns itself off and tells you. $1–$500, you confirm every change (change log). Telegram: /starship cap 10</div>
+      <div class="grp">Earlier entries</div><div class="list plain">
+        ${prow("min_score", "Analyst score cutoff", String(p.min_score), String(nm["analyst.min_score"]))}${prow("min_pool_age_min", "Youngest pool", `${p.min_pool_age_min} min`, `${nm["scanner.min_pool_age_min"]} min`)}
+        ${prow("min_liquidity_usd", "Min liquidity", `$${Number(p.min_liquidity_usd).toLocaleString("en-US")}`, `$${Number(nm["scanner.min_liquidity_usd"]).toLocaleString("en-US")}`)}
+        ${prow("max_h1_change_pct", "Max 1h spike", `+${p.max_h1_change_pct}%`, `+${nm["scanner.max_h1_change_pct"]}%`)}
+        ${prow("dip_pct", "Dip wait", `−${p.dip_pct}% / ${p.dip_wait_min} min`, `−${nm["executor.dip_pct"]}% / ${nm["executor.dip_wait_min"]} min`)}</div>`;
+    return head + hero + `<div class="grp">${x.enabled ? "Timer" : "Launch"}</div>${launch}<div class="grp">Starship vs normal</div>${ssPnl(x.stats)}${params}
+      <div class="ro" style="margin-top:14px">While ON, every auto buy (Scanner → Analyst → Brain → Executor) is a Starship trade. Manual and copy buys never are. The trading window, buy timers, risk stops and the Executor's re-check + amount read-back all still apply. Open Starship positions keep their tight exits after it lands.<br>Telegram: /starship · /starship on | off · /starship for 2h · /starship settings</div>`;
+  }
+  setInterval(() => document.querySelectorAll("[data-sscd]").forEach((el) => {
+    const left = +el.dataset.sscd - ssNow(), tx = fmtLeft(left); if (el.textContent !== tx) el.textContent = tx;
+    if (left <= 0 && !S.ssEndAsk) { S.ssEndAsk = true; setTimeout(() => { S.ssEndAsk = false; loadStarship(); ctlPoll().then(() => render(true)); }, 7000); }
+  }), 1000);
+  // Daily loss cap: the same /set path as every setting (preview -> confirm sheet -> change_log), $1–$500
+  async function ssCap() {
+    const v = +(($("#sscap") || {}).value || "").replace(",", ".");
+    if (!(v >= 1 && v <= 500)) return toast("Daily loss cap: $1 to $500");
+    sheet(`<div class="p2t">🚀 Daily Starship loss cap → $${esc(v)}</div><div class="ro">Starship turns itself off at this realized loss per Rome day.</div>
+      <div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
+    const r = await api("/api/set", { key: "starship.day_loss_usd", value: v }); const p = r.status === 200 && r.j.proposal;
+    if (!p) { const g = $("#p2go"); if (g) g.textContent = "Not changed"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
+    setMsg(apiText(r.j), ""); confirmStep(p.pid, `Confirm: loss cap $${v}`, "red", (j, ok) => { if (ok) { loadStarship(); loadSettings(true); } });
+  }
+  function ssToggle() { const x = S.ss || ssState(); if (!x) return; if (x.enabled) return ssAsk(false, null); ssLaunch(null); }
+  function ssLaunch(h) {
+    if (h === "c") {
+      sheet(`<div class="p2t">🚀 Starship for…</div><div class="ro">Hours, 0.25 to 24 (e.g. 1.5).</div>
+        <input id="p2val" class="livein p2in" type="text" inputmode="decimal" placeholder="1.5" autocomplete="off" spellcheck="false">
+        <div class="ro p2msg" id="p2msg"></div><button class="btn primary" id="p2go" style="width:100%;margin-top:12px">Review</button>`);
+      $("#p2go").onclick = () => { const v = +($("#p2val").value || "").replace(",", "."); if (v >= 0.25 && v <= 24) return ssAsk(true, v); setMsg("Type hours from 0.25 to 24", "err"); };
+      return;
+    }
+    ssAsk(true, h);
+  }
+  async function ssAsk(on, hours) {
+    if (!canCtl()) return toast("No control token on this device");
+    const live = curMode() === "LIVE";
+    sheet(`<div class="p2t">${on ? "🚀 Launch Starship Mode" + (hours ? ` for ${hours}h` : "") + "?" : "Land Starship Mode (OFF)?"}</div>
+      ${on && live ? `<div class="p2note live sswarn"><b>⚠️ LIVE · REAL MONEY.</b> Starship buys earlier, riskier coins, more often, with a tight stop: expect more small losses. Half size by default, max ${esc((S.ss && S.ss.params.max_open) || 2)} open, auto-off at the daily loss cap.</div>` : ""}
+      <div class="mrows" id="p2rows">${sk(36)}</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div>
+      <button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
+    const r = await api("/api/starship_set", on ? (hours ? { on: true, hours } : { on: true }) : { on: false });
+    const rows = $("#p2rows"); if (!rows) return; const p = r.status === 200 && r.j.proposal;
+    if (!p) { rows.innerHTML = ""; const g = $("#p2go"); if (g) g.textContent = "Not changed"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
+    const q = p.params || {};
+    rows.innerHTML = on ? `<div><span>Until</span><b>${p.until_ts ? romeHM(p.until_ts) + " Rome time, then OFF" : "you land it (or the loss cap)"}</b></div>
+        <div><span>Size</span><b>${esc(q.size_pct)}% of normal</b></div><div><span>Exits</span><b>stop −${esc(q.stop_pct)}% · TP ${esc(q.tp_x)}×</b></div>
+        <div><span>Caps</span><b>max ${esc(q.max_open)} open · −$${esc(q.day_loss_usd)}/day</b></div>${modeRow(p.mode)}`
+      : `<div><span>New buys</span><b>normal rules again</b></div><div><span>Open Starship</span><b>keep their tight exits</b></div>${modeRow(p.mode)}`;
+    setMsg(apiText(r.j), "");
+    confirmStep(p.pid, on ? (p.live ? "Confirm: Starship ON · real money" : "Confirm: Starship ON") : "Confirm: Starship OFF", on ? "red" : "primary", (j, ok) => {
+      if (ok && j.starship) ssSet(j.starship); ctlPoll().then(() => render(true)); render(true); });
+  }
+
   // ---- Settings (/set): same keys, limits and validation as Telegram (the desk checks; the form only helps)
   async function loadSettings(force) {
     if (S.setList && !force) return; S.setList = S.setList || null; S.setErr = null;
@@ -988,7 +1100,7 @@
   function viewSettings() {
     if (!S.setList) return backBar("Account") + `<h1 class="title">Settings</h1>` + (S.setErr ? `<div class="empty"><b>Can't load settings</b>${esc(S.setErr)}</div>` : sk(60) + sk(60) + sk(60));
     const groups = {}; S.setList.forEach((x) => (groups[x.group] = groups[x.group] || []).push(x));
-    const order = ["risk", "brain", "executor", "analyst", "scanner", "social", "desk", "copy_picks", "browser"];
+    const order = ["risk", "brain", "executor", "analyst", "scanner", "starship", "social", "desk", "copy_picks", "browser"];
     return backBar("Account") + `<h1 class="title">Settings</h1><div class="ro">Same settings and limits as /set in Telegram. Every change asks you to confirm, lands in the change log and Telegram confirms it.</div>
       ${order.filter((g) => groups[g]).map((g) => `<div class="grp">${esc(g.replace("_", " "))}</div><div class="list plain">${groups[g].map((x) => `<button class="row" data-act="setkey" data-k="${esc(x.key)}" style="width:100%;text-align:left"><div class="tx"><div class="t1">${esc(x.alias || x.key.split(".")[1].replace(/_/g, " "))}</div><div class="t2">${esc(x.key)}${x.range ? " · " + esc(x.range) : ""}</div></div><span class="sv">${esc(showVal(x))}</span><span class="ter">›</span></button>`).join("")}</div>`).join("")}`;
   }
@@ -1008,7 +1120,7 @@
       const p = r.status === 200 && r.j.proposal;
       if (!p) { go.disabled = false; go.textContent = "Review change"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
       setMsg(apiText(r.j), ""); const inp = $("#p2val"); if (inp) inp.disabled = true;
-      confirmStep(p.pid, "Confirm change", "red", (j, ok) => { if (ok) loadSettings(true); });
+      confirmStep(p.pid, "Confirm change", "red", (j, ok) => { if (ok) { loadSettings(true); if (S.ss) loadStarship(); } });
     };
   }
 
@@ -1263,7 +1375,8 @@
     report: ["Night report", "Night over, morning report"], desk_down: ["Desk down / STANDBY", "No heartbeat for 2 min, and back up"], risk_pause: ["Risk pause", "Buys stopped by a risk rule"],
     lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"],
     maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"], timer: ["Buy timer", "Timer started, cancelled, and when it ends"],
-    window: ["Trading window", "Window turned on / off, hours changed"] };
+    window: ["Trading window", "Window turned on / off, hours changed"],
+    starship: ["🚀 Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["🚀 Starship trades", "Each Starship buy, take profit and exit"] };
   const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
   function pushEnv() {
