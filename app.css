@@ -495,3 +495,11 @@ button.sw{border:0;padding:0;flex:none;cursor:pointer}button.sw.live{opacity:1}
 .p2in{margin-top:12px}
 html.tg a{color:var(--tg-link,var(--teal))}
 html.tg .tabbar{padding-bottom:calc(6px + var(--sb))}
+
+/* notifications */
+.qrow { gap: 10px; flex-wrap: wrap; }
+.qrow label { display: flex; align-items: center; gap: 6px; color: var(--mut, #8a96a3); font-size: 14px; }
+.qrow input[type=time] { background: #0d141b; color: inherit; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 6px 8px; font: inherit; color-scheme: dark; }
+.qrow .btn { margin-left: auto; }
+.tag.loud{color:#ffb547;background:rgba(255,181,71,.13);margin-left:4px}
+.nf .row .t1,.nf .row .t2{white-space:normal;overflow:visible;text-overflow:clip}

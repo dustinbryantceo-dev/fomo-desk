@@ -553,10 +553,10 @@
       <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
       <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
-      <div class="grp">Pushes</div><div class="list plain">
-        <div class="row"><div class="tx"><div class="t1">Telegram</div><div class="t2">${ac.pushes && ac.pushes.telegram ? "connected" : "not connected yet (STEP 11)"}</div></div></div>
-        <div class="row"><div class="tx"><div class="t1">Web push</div><div class="t2">Telegram only (plan B hosting)</div></div></div>
-        <div class="row"><div class="tx"><div class="t1 mut">Send test push</div><div class="t2">via Telegram (STEP 11)</div></div></div>
+      <div class="grp">Notifications</div><div class="list plain">
+        ${canCtl() ? `<button class="row" data-act="notif" style="width:100%;text-align:left"><div class="tx"><div class="t1">Notifications</div><div class="t2">Push to this phone · which events · quiet hours · Telegram alerts</div></div><span class="ter">›</span></button>`
+          : `<div class="row"><div class="tx"><div class="t1">Notifications</div><div class="t2">Open your Pump Pilot link with the control token to set up push</div></div></div>`}
+        <div class="row"><div class="tx"><div class="t1">Telegram</div><div class="t2">${ac.pushes && ac.pushes.telegram ? "connected" : "not connected"}</div></div></div>
         <div class="row"><div class="tx"><div class="t1">Watch in Grok Bot</div><div class="t2">Open the Grok Bot app to watch the bot's computer live</div></div></div>
       </div>
       ${canCtl() ? "" : `<div class="grp" style="margin-top:28px">Settings · read-only without the control token; Telegram: "set stop to -20%"</div>
@@ -599,6 +599,7 @@
     else if (top && top.kind === "audit") { ensure("audit/" + top.mint); html = viewAudit(top.mint); }
     else if (top && top.kind === "settings") html = viewSettings();
     else if (top && top.kind === "social") { ensure("account"); html = viewSocial(); }
+    else if (top && top.kind === "notif") html = viewNotif();
     else if (S.tab === "home") html = viewHome();
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); html = viewBots(); }
     else if (S.tab === "activity") html = viewActivity();
@@ -652,6 +653,14 @@
     else if (act === "setkey") openSet(t.dataset.k);
     else if (act === "social") { push({ kind: "social" }); loadSocial(true); }
     else if (act === "copysw") copySwitch(t.dataset.h);
+    else if (act === "notif") { push({ kind: "notif" }); loadNotif(true); }
+    else if (act === "pushon") pushEnable();
+    else if (act === "pushoff") pushDisable();
+    else if (act === "pushtest") pushTest();
+    else if (act === "evsw") prefSwitch({ events: { [t.dataset.e]: !(S.nf && S.nf.prefs && S.nf.prefs.events[t.dataset.e]) } });
+    else if (act === "quietsw") prefSwitch({ quiet: { on: !(S.nf && S.nf.prefs && S.nf.prefs.quiet.on) } });
+    else if (act === "quietsave") { const a = $("#qstart"), b = $("#qend"); if (a && b) prefSwitch({ quiet: { start: a.value, end: b.value } }, "Quiet hours saved"); }
+    else if (act === "tgsw") tgSwitch();
     else if (act === "p2invite") { const l = S.social && S.social.invite && S.social.invite[0]; if (l) { if (navigator.share) { try { await navigator.share({ title: "FOMO", url: l.url }); } catch {} } else { try { await navigator.clipboard.writeText(l.url); toast("Link copied"); } catch { toast(l.url); } } } }
     else if (act === "invite") invite();
     else if (act === "closesheet") closeSheet();
@@ -1130,6 +1139,126 @@
   }
   addEventListener("hashchange", () => { if (fxFlag()) { stripFxFlag(); if (S.state) fxDemo(); } });
 
+  // ---------- Notifications (web push) ----------
+  // The desk's outbox sends each event to this phone (web push) and, while the switch is on, to Telegram.
+  // iPhone: push only works in the home-screen app (iOS 16.4+), and the permission prompt needs a tap.
+  const EVLAB = { buy: ["Buy filled", "A bot or you bought"], exit: ["Sell / exit", "Trail, time or manual exit"], tp: ["Take profit", "First take profit hit"], stop: ["Stop loss", "Stopped out"],
+    report: ["Night report", "Night over, morning report"], desk_down: ["Desk down / STANDBY", "No heartbeat for 2 min, and back up"], risk_pause: ["Risk pause", "Buys stopped by a risk rule"],
+    lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"] };
+  const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
+  function pushEnv() {
+    if (S.tg || inTelegram()) return "telegram";
+    if (PF()) return PF().env || "ok";
+    if (isIOS() && !DeskCrypto.isStandalone()) return "iostab";
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported";
+    if (Notification.permission === "denied") return "denied";
+    return "ok";
+  }
+  const permission = () => (PF() ? PF().permission : "Notification" in window ? Notification.permission : "default");
+  async function swReg() { if (PF()) return PF().reg; return navigator.serviceWorker.ready; }
+  async function localSub() { try { const r = await Promise.race([swReg(), new Promise((_, no) => setTimeout(() => no(new Error("sw")), 4000))]); return await r.pushManager.getSubscription(); } catch { return null; } }
+  async function loadNotif(force) {
+    if (S.nf && !force) return;
+    const [r, sub] = await Promise.all([api("/api/push/prefs"), pushEnv() === "ok" ? localSub() : Promise.resolve(null)]);
+    S.nf = Object.assign(S.nf || {}, { at: Date.now(), err: r.status === 200 ? null : apiErr(r), sub: !!sub });
+    if (r.status === 200) Object.assign(S.nf, { prefs: r.j.prefs, devices: r.j.devices, key: r.j.vapid_public_key, loud: r.j.loud || [] });
+    render(true);
+  }
+  function envNote(env) {
+    const N = {
+      telegram: ["Telegram's in-app browser can't show notifications", "Open Pump Pilot from its icon on your Home Screen, then Account → Notifications → Enable. Your settings below still work from here."],
+      iostab: ["Notifications need the home-screen app", "On iPhone, Safari tabs can't get push. In Safari tap Share → Add to Home Screen, then open Pump Pilot from that icon and come back here. (Already added? Open it from the icon, not from Safari.)"],
+      unsupported: ["This browser can't do web push", "On iPhone you need iOS 16.4 or newer and the home-screen app. Telegram alerts keep working meanwhile."],
+      denied: ["Notifications are blocked for Pump Pilot", "iPhone: Settings → Notifications → Pump Pilot → Allow Notifications, then come back and tap Enable."] }[env];
+    return N ? `<div class="p2note warn"><b>${esc(N[0])}</b><br>${esc(N[1])}</div>` : "";
+  }
+  function viewNotif() {
+    const n = S.nf, p = n && n.prefs, env = pushEnv(), sw = (on, act, data, lab) => `<button class="sw ${on ? "on" : ""}" data-act="${act}" ${data || ""} aria-pressed="${!!on}" aria-label="${esc(lab)}"><i></i></button>`;
+    const here = n && n.sub && permission() === "granted";
+    const dev = n && n.devices != null ? `${n.devices} device${n.devices === 1 ? "" : "s"} with push on` : "";
+    const top = env !== "ok" ? envNote(env)
+      : !n ? sk(60)
+      : !n.key ? `<div class="p2note warn">The desk has no push key yet. Telegram alerts keep working.</div>`
+      : `<div class="list plain"><div class="row"><span class="cdot ${here ? "ok" : "mut"}"></span><div class="tx"><div class="t1">${here ? "Push is on for this phone" : "Push is off on this phone"}</div><div class="t2">${esc(dev)}</div></div>
+          ${here ? `<button class="btn sm" data-act="pushoff">Turn off</button>` : `<button class="btn sm primary" data-act="pushon" id="pushon">Enable</button>`}</div></div>
+         ${here ? `<div class="btns" style="margin-top:8px"><button class="btn" style="width:100%" data-act="pushtest" id="pushtest">Send test</button></div>` : `<div class="ro">Tap Enable, then Allow. iPhone asks only once.</div>`}`;
+    const ev = p ? Object.keys(EVLAB).map((k) => `<div class="row"><div class="tx"><div class="t1">${esc(EVLAB[k][0])}${(n.loud || []).includes(k) ? ' <span class="tag loud">rings in quiet hours</span>' : ""}</div><div class="t2">${esc(EVLAB[k][1])}</div></div>${sw(p.events[k], "evsw", `data-e="${k}"`, EVLAB[k][0])}</div>`).join("") : "";
+    return backBar("Account") + `<div class="nf"><h1 class="title">Notifications</h1>
+      ${n && n.err ? `<div class="p2note warn">${esc(n.err)}</div>` : ""}
+      <div class="grp">This phone</div>${top}
+      <div class="p2msg ro" id="nfmsg"></div>
+      ${p ? `<div class="grp">Events</div><div class="list plain">${ev}</div>
+      <div class="grp">Quiet hours</div><div class="list plain">
+        <div class="row"><div class="tx"><div class="t1">Quiet hours</div><div class="t2">${p.quiet.on ? `On · ${esc(p.quiet.start)}–${esc(p.quiet.end)} (Italy time) · only desk down, lockout and alerts ring` : "Off"}</div></div>${sw(p.quiet.on, "quietsw", "", "Quiet hours")}</div>
+        <div class="row qrow"><label>From <input type="time" id="qstart" value="${esc(p.quiet.start)}"></label><label>to <input type="time" id="qend" value="${esc(p.quiet.end)}"></label><button class="btn sm" data-act="quietsave">Save</button></div></div>
+      <div class="grp">Telegram</div><div class="list plain">
+        <div class="row"><div class="tx"><div class="t1">Telegram alerts</div><div class="t2">${p.telegram ? "On: Telegram gets the desk's messages as before" : "Off: only this app is notified. Telegram commands still work."}</div></div>${sw(p.telegram, "tgsw", "", "Telegram alerts")}</div></div>
+      <div class="ro">Push and Telegram both come from the desk's outbox. Changes here never touch trading.</div>` : ""}</div>`;
+  }
+  const nfMsg = (t) => { const m = $("#nfmsg"); if (m) m.innerHTML = nl2br(t || ""); };
+  const b64u = (s) => { const p = "=".repeat((4 - (s.length % 4)) % 4), r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+  async function pushEnable() {
+    if (pushEnv() !== "ok" || !S.nf || !S.nf.key) return render(true);
+    const btn = $("#pushon"); if (btn) btn.disabled = true;
+    // the permission prompt first, straight from the tap (iOS refuses it later in the promise chain)
+    let perm;
+    try { perm = PF() ? await PF().requestPermission() : await Notification.requestPermission(); } catch { perm = "default"; }
+    if (perm !== "granted") { render(true); return nfMsg(perm === "denied" ? "Blocked. iPhone: Settings → Notifications → Pump Pilot → Allow." : "Not allowed. Tap Enable again and choose Allow."); }
+    nfMsg("Turning on push…");
+    let sub;
+    try {
+      const reg = await swReg();
+      sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(S.nf.key) }));
+    } catch (e) { if (btn) btn.disabled = false; return nfMsg("This phone couldn't turn push on (" + esc(e.name || "error") + "). Close Pump Pilot fully, reopen it from the icon and try again."); }
+    const r = await api("/api/push/subscribe", { subscription: sub.toJSON ? sub.toJSON() : sub });
+    if (r.status !== 200) { if (btn) btn.disabled = false; return nfMsg(apiErr(r)); }
+    S.nf.sub = true; S.nf.devices = r.j.devices; haptic("success"); render(true); nfMsg("Push is on. Tap Send test to check.");
+  }
+  async function pushDisable() {
+    const sub = await localSub(); let ep = sub && sub.endpoint;
+    if (sub) { try { await sub.unsubscribe(); } catch {} }
+    if (ep) { const r = await api("/api/push/unsubscribe", { endpoint: ep }); if (r.status !== 200) nfMsg(apiErr(r)); }
+    S.nf.sub = false; render(true); await loadNotif(true); nfMsg("Push is off on this phone.");
+  }
+  async function pushTest() {
+    const b = $("#pushtest"); if (b) { b.disabled = true; b.textContent = "Sending…"; }
+    const r = await api("/api/push/test", {});
+    if (b) { b.disabled = false; b.textContent = "Send test"; }
+    if (r.status === 200) nfMsg(r.j.sent ? `Sent to ${r.j.sent} device${r.j.sent === 1 ? "" : "s"}. It should show in a few seconds, even with the app open.${r.j.removed ? ` (${r.j.removed} old device removed)` : ""}` : "The desk couldn't reach this phone's push service. Turn push off and Enable again.");
+    else if (r.status === 429) nfMsg("One test every 10 seconds.");
+    else nfMsg(apiErr(r));
+  }
+  // optimistic: flip now, roll back if the desk says no
+  async function prefSwitch(upd, okMsg) {
+    if (!S.nf || !S.nf.prefs) return;
+    const was = JSON.parse(JSON.stringify(S.nf.prefs));
+    if (upd.events) Object.assign(S.nf.prefs.events, upd.events);
+    if (upd.quiet) Object.assign(S.nf.prefs.quiet, upd.quiet);
+    if ("telegram" in upd) S.nf.prefs.telegram = upd.telegram;
+    render(true);
+    const r = await api("/api/push/prefs", upd);
+    if (r.status === 200 && r.j.prefs) { S.nf.prefs = r.j.prefs; render(true); if (okMsg) toast(okMsg); }
+    else { S.nf.prefs = was; render(true); toast(r.status === 400 ? "Not saved: check the times (HH:MM)" : apiErr(r)); }
+  }
+  function tgSwitch() {
+    const on = !!(S.nf && S.nf.prefs && S.nf.prefs.telegram);
+    if (!on) return prefSwitch({ telegram: true }, "Telegram alerts on");
+    const sh = sheet(`<div class="p2t">Turn Telegram alerts off?</div><div class="ro">Telegram stops getting desk messages (fills, alerts, reports). This app's notifications become the only channel, so check Send test works first. Telegram commands and the Pump Pilot button keep working. Telegram gets one last message saying it's off.</div>
+      <div class="btns" style="margin-top:12px"><button class="btn primary" id="tgoff">Turn off</button></div>`);
+    $("#tgoff").onclick = () => { closeSheet(); prefSwitch({ telegram: false }, "Telegram alerts off"); };
+    return sh;
+  }
+  // a tapped notification opens the right tab: ?tab= on a cold start, a message from the service worker when the app is open
+  const TABS = ["home", "bots", "activity", "account"];
+  function tabFromUrl() {
+    const q = new URLSearchParams(location.search), t = q.get("tab"); if (!t) return;
+    q.delete("tab"); history.replaceState(history.state, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
+    if (TABS.includes(t)) S.wantTab = t;
+  }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { const t = e.data && e.data.tab; if (e.data && e.data.type === "pp-open" && TABS.includes(t)) { if (S.state) go(t); else S.wantTab = t; } });
+  function applyWantTab() { if (S.wantTab && S.state) { const t = S.wantTab; S.wantTab = null; if (t !== S.tab) go(t); } }
+
   // ---------- start ----------
   // ---------- Telegram Mini App: telegram-web-app.js only when we are inside Telegram ----------
   const inTelegram = () => /[#&?]tgWebApp(Data|Version|Platform)=/.test(location.hash + "&" + location.search) || !!window.TelegramWebviewProxy || !!window.__TG_TEST;
@@ -1155,15 +1284,15 @@
   }
   function tgBack() { try { if (S.tg) S.stack.length ? S.tg.BackButton.show() : S.tg.BackButton.hide(); } catch {} }
   async function start() {
-    const wantDemo = fxFlag(); stripFxFlag();
+    const wantDemo = fxFlag(); stripFxFlag(); tabFromUrl();
     await setupTelegram();
     S.dp = DeskCrypto.dataPath() || S.tgDp; // takes #d= into localStorage; strips it only in the home-screen app (iOS storage is separate)
     S.a2hs = !DeskCrypto.isStandalone() && DeskCrypto.linkInUrl() && localStorage.getItem("desk.a2hs.off") !== "1";
     if (S.a2hs) showA2hs();
-    if (window.__DESK_FIXTURE) { fixture(window.__DESK_FIXTURE); if (wantDemo) setTimeout(fxDemo, 800); return; }
+    if (window.__DESK_FIXTURE) { fixture(window.__DESK_FIXTURE); applyWantTab(); if (wantDemo) setTimeout(fxDemo, 800); return; }
     if (!S.dp) { render(); if (wantDemo) setTimeout(() => toast("Open your desk link first, then replay"), 500); return; }
     S.desk = await DeskCrypto.open(S.dp, BASE);
-    render(); await poll();
+    render(); await poll(); applyWantTab();
     if (wantDemo) setTimeout(fxDemo, 600);
     setInterval(poll, POLL_S * 1000);
     setInterval(() => { const g = $("#gaten"); if (g) g.textContent = Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000)); }, 1000);
