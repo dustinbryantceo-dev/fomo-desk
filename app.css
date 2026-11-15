@@ -509,3 +509,22 @@ html.tg .tabbar{padding-bottom:calc(6px + var(--sb))}
 .maint.failed{background:#2a2112;color:#ffc36b;border-color:rgba(255,166,43,.35)}
 #tghome.hl{outline:2px solid rgba(0,194,255,.6);border-radius:18px}
 #tghome .t1,#tghome .t2{white-space:normal;overflow:visible;text-overflow:clip}
+
+/* ---- Trading window + buy timer (2026-11-15) ---- */
+.wstat{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-lg);border:1px solid var(--card-b);background:var(--c1);box-shadow:var(--card-hi),var(--shadow-1);margin:4px 0 6px}
+.wstat .tx{flex:1;min-width:0}.wstat .t1{font-weight:700;font-size:var(--fs-lg)}.wstat .t2{color:var(--sec);font-size:var(--fs-sm);margin-top:2px}
+.wstat .wdot{width:12px;height:12px;border-radius:6px;flex:none}
+.wstat.go{border-color:rgba(0,245,160,.3)}.wstat.go .wdot{background:var(--green);box-shadow:0 0 12px rgba(0,245,160,.7)}
+.wstat.stop{border-color:rgba(255,166,43,.35);background:rgba(255,166,43,.06)}.wstat.stop .wdot{background:var(--orange);box-shadow:0 0 12px rgba(255,166,43,.7)}
+.wnow{font:600 var(--fs-lg) var(--mono);text-align:right;line-height:1.1}.wnow small{display:block;font:500 var(--fs-xs) var(--txt);color:var(--ter)}
+.wtimer{padding:16px;border-radius:var(--r-lg);border:1px solid rgba(25,230,193,.3);background:linear-gradient(160deg,rgba(25,230,193,.10),rgba(12,21,25,.85));box-shadow:var(--card-hi),var(--shadow-2);text-align:center}
+.wtimer.pause,.wtimer.stopped{border-color:rgba(255,166,43,.4);background:linear-gradient(160deg,rgba(255,166,43,.12),rgba(12,21,25,.85))}
+.wtimer .wk{font-weight:700;font-size:var(--fs-md);color:var(--sec)}
+.wtimer .wcd{font:700 46px/1.1 var(--mono);letter-spacing:1px;margin:8px 0 4px;color:var(--text)}
+.wtimer .t2{color:var(--sec);font-size:var(--fs-sm)}.wtimer .t2 b{color:var(--text)}
+.wpick .row.col{flex-direction:column;align-items:stretch;gap:8px}
+.wpick .t2{color:var(--ter);font-size:var(--fs-xs)}
+.wchips{display:flex;flex-wrap:wrap;gap:8px}
+.wchip{min-height:38px;min-width:52px;padding:0 12px;border-radius:999px;background:var(--c2);border:1px solid var(--sep);font-weight:600;font-size:var(--fs-sm)}
+.wchip:active{background:linear-gradient(135deg,var(--teal-2),var(--teal));color:#00130f}
+.wpick .t2,.wwin .t2{white-space:normal;overflow:visible;text-overflow:clip}

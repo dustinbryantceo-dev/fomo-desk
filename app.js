@@ -558,7 +558,7 @@
       </div>
       ${canCtl() ? `<div class="grp">Control</div><div class="list plain">
         <button class="row" data-act="settingsv" style="width:100%;text-align:left"><div class="tx"><div class="t1">Settings</div><div class="t2">Stop, take profit, trail, sizes… same as /set, with confirm</div></div><span class="ter">›</span></button>
-        <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window</div><div class="t2">${S.ctl.s && S.ctl.s.window_enabled === false ? "OFF · buys 24/7" : "ON · night only"} · /time</div></div><span class="ter">›</span></button>
+        <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window &amp; buy timer</div><div class="t2">${winAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="bots" style="width:100%;text-align:left"><div class="tx"><div class="t1">Pause / resume bots</div><div class="t2">${pausedNow().size ? "Paused: " + esc([...pausedNow()].join(", ")) : "All running"}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite · copy traders on/off · withdraw</div></div><span class="ter">›</span></button>
         <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
@@ -614,6 +614,7 @@
     else if (top && top.kind === "settings") html = viewSettings();
     else if (top && top.kind === "social") { ensure("account"); html = viewSocial(); }
     else if (top && top.kind === "notif") html = viewNotif();
+    else if (top && top.kind === "window") html = viewWindow();
     else if (S.tab === "home") html = viewHome();
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); html = viewBots(); }
     else if (S.tab === "activity") html = viewActivity();
@@ -661,7 +662,12 @@
     else if (act === "buy") openTrade("buy", t.dataset.mint, t.dataset.sym);
     else if (act === "why") loadWhy(t.dataset.mint);
     else if (act === "bots") openBots();
-    else if (act === "window") openWindow();
+    else if (act === "window") { push({ kind: "window" }); loadWindow(); }
+    else if (act === "wtimer") winTimer(t.dataset.k, t.dataset.m === "c" ? "c" : +t.dataset.m);
+    else if (act === "wstopat") { const v = ($("#wstop") || {}).value; if (v) winUntil("allow", v); else toast("Pick a time"); }
+    else if (act === "wcancel") winCancel();
+    else if (act === "wtoggle") winToggle();
+    else if (act === "wsave") winSave();
     else if (act === "report") openReport();
     else if (act === "settingsv") { push({ kind: "settings" }); loadSettings(true); }
     else if (act === "setkey") openSet(t.dataset.k);
@@ -676,7 +682,6 @@
     else if (act === "quietsave") { const a = $("#qstart"), b = $("#qend"); if (a && b) prefSwitch({ quiet: { start: a.value, end: b.value } }, "Quiet hours saved"); }
     else if (act === "tgsw") tgSwitch();
     else if (act === "maintloud") prefSwitch({ maint_loud: !(S.nf && S.nf.prefs && S.nf.prefs.maint_loud) });
-    else if (act === "tga2hs") tgAddHome();
     else if (act === "p2invite") { const l = S.social && S.social.invite && S.social.invite[0]; if (l) { if (navigator.share) { try { await navigator.share({ title: "FOMO", url: l.url }); } catch {} } else { try { await navigator.clipboard.writeText(l.url); toast("Link copied"); } catch { toast(l.url); } } } }
     else if (act === "invite") invite();
     else if (act === "closesheet") closeSheet();
@@ -858,23 +863,119 @@
   }
 
   // ---- Trading window (/time)
-  async function openWindow() {
-    sheet(`<div class="p2t">Trading window</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
-    const r = await api("/api/time"); if (r.status !== 200) return setMsg(apiErr(r), "err");
-    const on = r.j.window_enabled, go = $("#p2go"); setMsg(apiText(r.j), "");
-    go.disabled = false; go.className = "btn"; go.textContent = on ? "Turn window OFF (buys 24/7)" : "Turn window ON (night only)"; let armed = false; const key = idem();
-    go.onclick = async () => {
-      if (!armed) { armed = true; go.className = "btn red"; go.textContent = on ? "Confirm: buys 24/7, no morning sell-off" : "Confirm: night window back"; return; }
-      go.disabled = true; go.textContent = "Sending…";
-      const x = await api("/api/time_set", { on: !on, idem: key });
-      if (x.status === 200) { go.textContent = "Done ✓"; setMsg(apiText(x.j), "ok"); if (S.ctl.s) S.ctl.s.window_enabled = x.j.window_enabled; } else { go.textContent = "Not done"; setMsg(apiErr(x), "err"); }
-    };
-  }
   async function openReport() {
     sheet(`<div class="p2t">Morning report</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><div id="p2links"></div>`);
     const r = await api("/api/report"); if (r.status !== 200) return setMsg(apiErr(r), "err");
     setMsg(apiText(r.j), ""); const u = ((r.j.messages || [])[0] || {}).text || ""; const m = u.match(/https:\/\/\S+/);
     if (m) $("#p2links").innerHTML = `<a class="btn primary" style="margin-top:12px" href="${esc(m[0])}" target="_blank" rel="noopener noreferrer">Open the morning Page</a>`;
+  }
+
+  // ---- Trading window + buy timers (2026-11-15). Same Telegram handlers: /window, /window 22:00-06:30, /time on|off,
+  // /pausebuys 2h, /allowbuys 2h, /stopbuys 23:30, /canceltimer. Timers touch NEW buys only; the desk keeps the end time in
+  // its db, so a timer survives restarts and ends by itself. Every change: a confirm sheet here, then the desk, then Telegram.
+  const romeHM = (ts) => new Date(ts * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" });
+  const fmtLeft = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`; };
+  const durTxt = (m) => (m % 60 ? (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`) : `${m / 60}h`);
+  const srvNow = () => Date.now() / 1000 - ((S.win && S.win._skew) || 0);
+  async function loadWindow() {
+    const r = await api("/api/window"); S.winErr = r.status === 200 ? null : apiErr(r);
+    if (r.status === 200 && r.j.window) { S.win = r.j.window; S.win._skew = Date.now() / 1000 - (S.win.server_ts || Date.now() / 1000); }
+    if (S.stack.length && S.stack[S.stack.length - 1].kind === "window") render(true);
+  }
+  function winAccountLine() {
+    const s = S.ctl.s || {}, t = s.buy_timer, w = s.window || {};
+    const base = s.window_enabled === false ? "OFF · buys 24/7" : `ON · ${esc(w.start || "")}–${esc(w.end || "")} Rome`;
+    if (!t) return base + " · no timer";
+    if (t.kind === "stopped") return base + " · ⏹ buys stopped by timer";
+    return base + ` · ⏱️ ${t.kind === "pause" ? "paused" : "buys"} until ${romeHM(t.until_ts)}`;
+  }
+  function viewWindow() {
+    const w = S.win, head = backBar("Account") + `<h1 class="title">Trading window</h1>`;
+    if (!w) return head + (S.winErr ? `<div class="empty"><b>Can't reach the desk</b>${esc(S.winErr)}</div>` : sk(84) + sk(150) + sk(120));
+    const t = w.timer, blk = w.buy_block;
+    const why = blk ? esc(blk) : !w.enabled ? "Window is off: buys 24/7" : t && t.kind === "allow" && !w.in_hours ? "Allow timer: open outside the window" : `Inside the window ${esc(w.start)}–${esc(w.end)}`;
+    const stat = `<div class="wstat ${blk ? "stop" : "go"}"><span class="wdot"></span><div class="tx"><div class="t1">${blk ? "No new buys now" : "New buys allowed now"}</div><div class="t2">${why}</div></div><span class="wnow">${esc(w.now_rome || "")}<small>Rome</small></span></div>`;
+    const chip = (k, m, lab) => `<button class="wchip" data-act="wtimer" data-k="${k}" data-m="${m}">${esc(lab)}</button>`;
+    const timer = t ? `<div class="wtimer ${esc(t.kind)}">
+          <div class="wk">${t.kind === "pause" ? "⏸ New buys paused" : t.kind === "allow" ? "▶️ Buys allowed, then stop" : "⏹ New buys stopped"}</div>
+          ${t.until_ts ? `<div class="wcd" data-cd="${t.until_ts}">${fmtLeft(t.until_ts - srvNow())}</div>
+          <div class="t2">until <b>${romeHM(t.until_ts)}</b> Rome time · then ${t.kind === "pause" ? "buys are allowed again" : "new buys stop until you tap Resume buys"}</div>`
+            : `<div class="t2">since ${romeHM(t.started_ts)} Rome time · no end time</div>`}
+          <button class="btn ${t.kind === "stopped" ? "primary" : ""}" data-act="wcancel" style="width:100%;margin-top:12px">${t.kind === "stopped" ? "▶️ Resume buys" : "Cancel timer"}</button></div>`
+      : `<div class="list plain wpick">
+          <div class="row col"><div class="t1">Pause new buys for</div><div class="wchips">${chip("pause", 30, "30m")}${chip("pause", 60, "1h")}${chip("pause", 120, "2h")}${chip("pause", 240, "4h")}${chip("pause", 480, "8h")}${chip("pause", "c", "Custom")}</div>
+            <div class="t2">Then back to normal by itself.</div></div>
+          <div class="row col"><div class="t1">Allow buys only for the next</div><div class="wchips">${chip("allow", 60, "1h")}${chip("allow", 120, "2h")}${chip("allow", 240, "4h")}${chip("allow", 480, "8h")}${chip("allow", "c", "Custom")}</div>
+            <div class="t2">Opens buys even outside the window; when it ends, new buys stop until you tap Resume.</div></div>
+          <div class="row qrow"><label>Stop buys at <input type="time" id="wstop" value=""></label><button class="btn sm" data-act="wstopat">Set</button></div></div>`;
+    return head + stat + `<div class="grp">Buy timer</div>${timer}
+      <div class="grp">Window</div><div class="list plain wwin">
+        <div class="row"><div class="tx"><div class="t1">Trading window</div><div class="t2">${w.enabled ? `ON · new buys only ${esc(w.start)}–${esc(w.end)} · sell-all at ${esc(w.end)}` : `OFF · buys 24/7 · saved hours ${esc(w.start)}–${esc(w.end)}`}</div></div>
+          <button class="sw ${w.enabled ? "on" : ""}" data-act="wtoggle" aria-pressed="${!!w.enabled}" aria-label="Trading window"><i></i></button></div>
+        <div class="row qrow"><label>From <input type="time" id="wa" value="${esc(w.start)}"></label><label>to <input type="time" id="wb" value="${esc(w.end)}"></label><button class="btn sm" data-act="wsave">Save</button></div></div>
+      <div class="p2note">Hours are <b>Rome time</b> (the server runs UTC; summer/winter time is handled). ${w.enabled ? `With the window ON the desk <b>sells every open position at ${esc(w.end)}</b>.` : "Saving hours doesn't turn the window on."}</div>
+      <div class="ro" style="margin-top:14px">Sells, stops and take profits always run; timers and the window only stop <b>new</b> buys. A risk stop (night loss, FOMO logged out) always wins.<br>Telegram: /window · /window hours 22-06 · /pausebuys 2h · /buysfor 3h · /stopbuys 23:30 · /canceltimer</div>`;
+  }
+  function winTick() {
+    document.querySelectorAll("[data-cd]").forEach((el) => {
+      const left = +el.dataset.cd - srvNow(); const tx = fmtLeft(left); if (el.textContent !== tx) el.textContent = tx;
+      if (left <= 0 && !S.winEndAsk) { S.winEndAsk = true; setTimeout(() => { S.winEndAsk = false; loadWindow(); ctlPoll(); }, 6500); }
+    });
+  }
+  setInterval(winTick, 1000);
+  function winDone(j) { if (j && j.window) { S.win = j.window; S.win._skew = Date.now() / 1000 - (S.win.server_ts || Date.now() / 1000); } ctlPoll().then(() => render(true)); render(true); }
+  // one confirm sheet for every act (timer start / cancel / window on-off): the 2nd tap sends, one idempotency key per sheet
+  function winAct(title, lines, label, cls, path, body) {
+    sheet(`<div class="p2t">${esc(title)}</div><div class="mrows">${lines.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>
+      <div class="ro p2msg" id="p2msg"></div><button class="btn ${cls}" id="p2go" style="width:100%;margin-top:12px">${esc(label)}</button>`);
+    const go = $("#p2go"), key = idem();
+    go.onclick = async () => {
+      if (go.disabled) return; go.disabled = true; go.classList.add("dis"); go.textContent = "Sending…"; setMsg("Sending to the desk…", "busy");
+      const r = await api(path, Object.assign({}, body, { idem: key }), 20000);
+      if (r.status === 200 && r.j.ok) { go.textContent = "Done ✓"; setMsg(apiText(r.j) || "Done.", "ok"); haptic("success"); winDone(r.j); }
+      else { go.textContent = "Not done"; setMsg(apiErr(r), "err"); haptic("error"); }
+    };
+  }
+  function winTimer(kind, m) {
+    if (m === "c") {
+      sheet(`<div class="p2t">${kind === "pause" ? "Pause new buys" : "Allow buys only for"}…</div><div class="ro">Minutes (5 to 1440), or a Rome time like 01:30.</div>
+        <input id="p2val" class="livein p2in" type="text" inputmode="text" placeholder="90 or 01:30" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div class="ro p2msg" id="p2msg"></div><button class="btn primary" id="p2go" style="width:100%;margin-top:12px">Review</button>`);
+      $("#p2go").onclick = () => { const v = $("#p2val").value.trim();
+        if (/^\d{1,4}$/.test(v) && +v >= 5 && +v <= 1440) return winTimer(kind, +v);
+        const c = v.replace(".", ":").match(/^([01]?\d|2[0-3]):([0-5]\d)$/); if (c) return winUntil(kind, `${c[1].padStart(2, "0")}:${c[2]}`);
+        setMsg("Type minutes (5–1440) or a time like 01:30", "err"); };
+      return;
+    }
+    const end = srvNow() + m * 60;
+    winAct(kind === "pause" ? `Pause new buys for ${durTxt(m)}?` : `Allow buys for the next ${durTxt(m)}?`,
+      [["Until", `${romeHM(end)} Rome time`], ["Then", kind === "pause" ? "buys allowed again" : "new buys stop until you tap Resume"], ["Sells / stops", "keep running"], ["Mode", curMode() === "LIVE" ? "🟢 LIVE" : "🧪 PAPER"]],
+      kind === "pause" ? `Confirm: pause buys until ${romeHM(end)}` : `Confirm: buys until ${romeHM(end)}`, kind === "pause" ? "red" : "primary", "/api/buytimer", { kind, minutes: m });
+  }
+  function winUntil(kind, hhmm) {
+    winAct(kind === "pause" ? `Pause new buys until ${hhmm}?` : `Stop buys at ${hhmm}?`,
+      [["Until", `${hhmm} Rome time (next time it's ${hhmm})`], ["Then", kind === "pause" ? "buys allowed again" : "new buys stop until you tap Resume"], ["Sells / stops", "keep running"]],
+      kind === "pause" ? `Confirm: pause buys until ${hhmm}` : `Confirm: stop buys at ${hhmm}`, kind === "pause" ? "red" : "primary", "/api/buytimer", { kind, until: hhmm });
+  }
+  function winCancel() {
+    const t = S.win && S.win.timer; if (!t) return;
+    winAct(t.kind === "stopped" ? "Resume new buys?" : "Cancel the buy timer?", [["Timer", t.kind === "pause" ? `paused until ${romeHM(t.until_ts)}` : t.kind === "allow" ? `buys until ${romeHM(t.until_ts)}` : "buys stopped"], ["After", "normal rules (window / 24-7)"]],
+      t.kind === "stopped" ? "Confirm: resume buys" : "Confirm: cancel timer", "primary", "/api/buytimer", { kind: "cancel" });
+  }
+  function winToggle() {
+    const w = S.win; if (!w) return; const on = !w.enabled;
+    winAct(on ? "Turn the trading window ON?" : "Turn the trading window OFF?",
+      on ? [["New buys", `only ${w.start}–${w.end} Rome time`], ["At " + w.end, "the desk sells every open position"], ["Right now", w.in_hours ? "inside the hours: buys go on" : "outside the hours: new buys stop now, no sell-off now"]]
+         : [["New buys", "24/7"], ["Sell-off", `none at ${w.end}`], ["Saved hours", `${w.start}–${w.end} (kept)`]],
+      on ? "Confirm: window ON" : "Confirm: buys 24/7", "red", "/api/time_set", { on });
+  }
+  async function winSave() {
+    const a = ($("#wa") || {}).value, b = ($("#wb") || {}).value; if (!a || !b) return toast("Pick both times");
+    sheet(`<div class="p2t">Window hours</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
+    const r = await api("/api/window_hours", { start: a, end: b }); const p = r.status === 200 && r.j.proposal;
+    if (!p) { const g = $("#p2go"); if (g) { g.textContent = "Not changed"; } return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
+    setMsg(apiText(r.j), ""); confirmStep(p.pid, `Confirm: ${p.new} Rome time`, "red", (j, ok) => { if (ok) winDone(j); });
   }
 
   // ---- Settings (/set): same keys, limits and validation as Telegram (the desk checks; the form only helps)
@@ -1161,7 +1262,8 @@
   const EVLAB = { buy: ["Buy filled", "A bot or you bought"], exit: ["Sell / exit", "Trail, time or manual exit"], tp: ["Take profit", "First take profit hit"], stop: ["Stop loss", "Stopped out"],
     report: ["Night report", "Night over, morning report"], desk_down: ["Desk down / STANDBY", "No heartbeat for 2 min, and back up"], risk_pause: ["Risk pause", "Buys stopped by a risk rule"],
     lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"],
-    maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"] };
+    maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"], timer: ["Buy timer", "Timer started, cancelled, and when it ends"],
+    window: ["Trading window", "Window turned on / off, hours changed"] };
   const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
   function pushEnv() {
@@ -1183,12 +1285,8 @@
     render(true);
   }
   // Telegram 8.0+: addToHomeScreen() makes a Telegram shortcut (opens the Mini App; no iPhone notifications from it)
-  const tgCanHome = () => { try { return !!(S.tg && S.tg.addToHomeScreen && (!S.tg.isVersionAtLeast || S.tg.isVersionAtLeast("8.0"))); } catch { return false; } };
-  function tgAddHome() {
-    if (!tgCanHome()) return toast("This Telegram can't add shortcuts. Use /install for the real app.");
-    try { S.tg.onEvent && S.tg.onEvent("homeScreenAdded", () => toast("Shortcut added")); S.tg.addToHomeScreen(); } catch { toast("Telegram didn't add it. Use /install instead."); }
-  }
-  const tgHomeRow = () => S.tg ? `<div class="list plain" id="tghome"><div class="row"><div class="tx"><div class="t1">Add to Home Screen</div><div class="t2">${tgCanHome() ? "A Telegram shortcut: opens Pump Pilot inside Telegram, so it can't show iPhone notifications. For notifications send /install and add the Safari app." : "This Telegram can't make shortcuts. Send /install in the chat for the real home-screen app."}</div></div>${tgCanHome() ? `<button class="btn sm" data-act="tga2hs">Add</button>` : ""}</div></div>` : "";
+  // 2026-11-15 (Dustin): no Telegram shortcut any more (it only reopened Telegram). Point to /install = the real Safari app.
+  const tgHomeRow = () => S.tg ? `<div class="list plain" id="tghome"><div class="row"><div class="tx"><div class="t1">Get the real app: send /install</div><div class="t2">In this chat send /install, then press and hold the link → Open in Safari → Share → Add to Home Screen. That app gets iPhone notifications.</div></div></div></div>` : "";
   function envNote(env) {
     const N = {
       telegram: ["Telegram's in-app browser can't show notifications", "Open Pump Pilot from its icon on your Home Screen, then Account → Notifications → Enable. No icon yet? Send /install in the Telegram chat. Your settings below still work from here."],
