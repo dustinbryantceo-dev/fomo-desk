@@ -1,0 +1,17 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Desk · decrypt test</title><style>body{background:#000;color:#fff;font:14px -apple-system,sans-serif;padding:16px}pre{white-space:pre-wrap;color:rgba(235,235,245,.6)}</style>
+<p>Plan B decrypt test (STEP 8). Open once as <code>…/decrypt-test.html#d=DATA_PATH</code>.</p><pre id=o>…</pre>
+<script src="desk-crypto.js"></script><script>
+const BASE = "https://raw.githubusercontent.com/dustinbryantceo-dev/fomo-desk/data";
+(async () => {
+  const o = document.getElementById("o"), dp = DeskCrypto.dataPath();
+  if (!dp) { o.textContent = "No data path on this device."; return; }
+  const d = await DeskCrypto.open(dp, BASE);
+  const tick = async () => {
+    try { const s = await d.get("state"); const st = s.data;
+      o.textContent = `seq ${s.seq} · ${new Date(s.t*1000).toLocaleTimeString()} · ${st.mode} · $${st.balance} · bots ${st.bots.map(b=>b.name+":"+b.status).join(" ")} · positions ${st.positions.length}`;
+    } catch (e) { o.textContent = "error: " + e.message; }
+  };
+  tick(); setInterval(tick, 15000);
+})();
+</script>
