@@ -474,8 +474,45 @@
       <div class="rv">${money(p.value_usd)}<small class="${(p.change_pct || 0) >= 0 ? "up" : "down"}">${pct(p.change_pct)}</small></div></div>`;
   }
 
+  // ---------- Skips (skips.py): why coins were looked at but not bought ----------
+  function skipCounts(rows, n) {
+    if (!rows || !rows.length) return '<div class="t2" style="padding:6px 0">No skips</div>';
+    const max = Math.max(...rows.map((r) => r.coins)) || 1;
+    return rows.slice(0, n).map((r) => `<div class="row" style="min-height:40px;padding:6px 0"><div class="tx"><div class="t1" style="font-size:15px">${esc(r.label)}${r.rug ? ' <span class="tag">🛡️ rug safety</span>' : ""}</div>
+      <div style="height:6px;border-radius:3px;background:var(--c3,#333);margin-top:4px"><div style="height:6px;border-radius:3px;width:${Math.round((100 * r.coins) / max)}%;background:var(--accent,#7aa2ff)"></div></div></div><div class="rv">${r.coins}</div></div>`).join("");
+  }
+  function skipCard() {
+    const s = S.files["skips"];
+    if (s === undefined) return sk(120);
+    if (!s) return "";
+    return `<div class="card" style="margin-bottom:12px" data-act="skips"><div class="grp" style="margin:0 0 4px">🔎 Skips · last hour ${s.mode === "starship" ? "· 🚀 Starship rules" : ""}</div>${skipCounts(s.last_hour, 4)}
+      <div class="row" style="min-height:40px"><div class="tx"><div class="t2">Tonight: ${s.tonight.reduce((a, r) => a + r.coins, 0)} skips · ${s.recent.length} recent coins</div></div><span class="ter">›</span></div></div>`;
+  }
+  function viewSkips() {
+    const s = S.files["skips"];
+    if (!s) return `<h1 class="title">Skips</h1>${s === undefined ? sk(200) : '<div class="empty"><b>No skip log yet</b>Every coin the bots look at but do not buy shows up here.</div>'}`;
+    return `<h1 class="title">Skips</h1><div class="card" style="margin-bottom:12px"><div class="grp" style="margin:0 0 4px">Last hour</div>${skipCounts(s.last_hour, 8)}</div>
+      <div class="card" style="margin-bottom:12px"><div class="grp" style="margin:0 0 4px">Tonight (since ${hm(s.night_start)})</div>${skipCounts(s.tonight, 12)}</div>
+      <div class="grp">Recent skipped coins</div>${s.recent.length ? `<div class="list">${s.recent.map((r) => `<div class="row" data-act="skip" data-mint="${esc(r.mint)}"><div class="tx"><div class="t1">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(r.bot)}${r.mode === "starship" ? " · 🚀" : ""}</span></div>
+        <div class="t2">${esc(r.reasons.map((x) => x.text).slice(0, 2).join(" · "))} · ${hm(r.ts)}</div></div><span class="ter">›</span></div>`).join("")}</div>` : '<div class="empty">No coins skipped in the last 24 h</div>'}
+      <div class="t2" style="padding:12px 4px">Kept ${s.keep_days} days · 🛡️ = rug-safety filter (kept strict)</div>`;
+  }
+  function viewSkip(mint) {
+    const s = S.files["skips"], r = s && s.recent.find((x) => x.mint === mint);
+    if (!r) return `<h1 class="title">Skip</h1><div class="empty">Not in the recent skip log</div>`;
+    return `<h1 class="title">${sym(r.symbol, r.mint)}</h1><div class="card"><div class="grp" style="margin:0 0 4px">Skipped ${hm(r.ts)} by ${esc(r.bot)}${r.mode === "starship" ? " · 🚀 Starship rules" : ""}</div>
+      ${r.reasons.map((x) => `<div class="row" style="min-height:44px"><div class="tx"><div class="t1" style="font-size:15px">✗ ${esc(x.label)}${x.rug ? ' <span class="tag">🛡️</span>' : ""}</div><div class="t2">${esc(x.text)}</div></div>
+        <div class="rv">${x.value != null && x.threshold != null ? `${esc(fmtSkip(x.value, x.filter))} <span class="mut">${esc(x.op || "")} ${esc(fmtSkip(x.threshold, x.filter))}</span>` : ""}</div></div>`).join("")}</div>
+      <div class="t2" style="padding:12px 4px;word-break:break-all">${esc(r.mint)}</div>${S.files["coin/" + mint] !== undefined || (S.ix && S.ix.files["coin/" + mint]) ? `<button class="loadmore" data-act="coin" data-mint="${esc(mint)}">Open coin</button>` : ""}`;
+  }
+  function fmtSkip(v, f) {
+    if (f === "liquidity") return "$" + Math.round(v).toLocaleString();
+    if (["top10", "h1_spike", "holders_growth", "dev_wallet", "lp_locked", "insiders", "liquidity_pulled"].includes(f)) return Math.round(v) + "%";
+    if (f === "pool_age") return v.toFixed(1) + " min";
+    return String(Math.round(v * 100) / 100);
+  }
   function viewBots() {
-    return `<h1 class="title">Bots</h1>${BOT_ORDER.map((n) => {
+    return `<h1 class="title">Bots</h1>${skipCard()}${BOT_ORDER.map((n) => {
       const b = bots()[n] || { name: n, title: n }, dec = S.files["bots/" + n];
       const locked = n === "risk" && b.locked;
       const rows = dec ? dec.rows : null;
@@ -490,12 +527,31 @@
     }).join("")}`;
   }
 
+  // skipped coins in the Activity feed (skips.py): one compact row per coin (newest 30, last 24 h), from the "skips" file,
+  // never from the activity pages, so trades stay on top and publish size stays small. Filter: All | Trades | Skips.
+  function skipActRow(r) {
+    const x = r.reasons[0] || {}, more = r.reasons.length > 1 ? ` +${r.reasons.length - 1}` : "";
+    return `<div class="row" style="min-height:44px" data-act="skip" data-mint="${esc(r.mint)}"><div class="ic" style="color:#8e8e93;opacity:.7">·</div>
+      <div class="tx"><div class="t1" style="font-size:15px">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(x.label || "")}${r.mode === "starship" ? " · 🚀" : ""}</span></div>
+      <div class="t2">${esc(x.text || "")}${more} · ${hm(r.ts)}</div></div><div class="rv"><span class="mut">Skipped</span></div></div>`;
+  }
   function viewActivity() {
     const pages = []; for (let i = 0; i < 10 && S.files["activity/" + i]; i++) pages.push(S.files["activity/" + i]);
     const rows = pages.flatMap((p) => p.rows), more = pages.length && pages[pages.length - 1].next_before;
     if (!S.files["activity/0"]) return `<h1 class="title">Activity</h1>${sk(60)}${sk(60)}${sk(60)}`;
     localStorage.setItem("desk.seen", String(rows[0] ? rows[0].ts : Date.now() / 1000));
-    return `<h1 class="title">Activity</h1>${rows.length ? `<div class="list">${rows.map(actRow).join("")}</div>${more ? `<button class="loadmore" data-act="more">Load more</button>` : ""}` : '<div class="empty"><b>Nothing yet tonight</b>Bought, sold, stopped and rejected coins show up here.</div>'}`;
+    const f = localStorage.getItem("desk.actf") || "all", sks = (S.files["skips"] && S.files["skips"].recent) || [];
+    const open = localStorage.getItem("desk.skopen") === "1";
+    const chip = (k, l) => `<button class="loadmore" style="display:inline-block;width:auto;margin:0 6px 10px 0;padding:6px 14px;${f === k ? "font-weight:700;outline:2px solid currentColor" : "opacity:.7"}" data-act="actf" data-f="${k}">${l}</button>`;
+    const chips = `<div>${chip("all", "All")}${chip("trades", "Trades")}${chip("skips", "Skips" + (sks.length ? " " + sks.length : ""))}</div>`;
+    const trades = rows.length ? `<div class="list">${rows.map(actRow).join("")}</div>${more ? `<button class="loadmore" data-act="more">Load more</button>` : ""}`
+      : '<div class="empty"><b>No trades yet tonight</b>Bought, sold, stopped and Analyst-rejected coins show up here.</div>';
+    const skl = (n) => sks.length ? `<div class="list">${sks.slice(0, n).map(skipActRow).join("")}</div>` : '<div class="empty">No coins skipped in the last 24 h</div>';
+    let body;
+    if (f === "trades") body = trades;
+    else if (f === "skips") body = skl(sks.length);
+    else body = `${trades}<div class="grp" style="margin-top:14px" data-act="skopen">🔎 Skipped coins ${sks.length ? "· " + sks.length : ""} <span class="ter">${open ? "▾" : "▸"}</span></div>${open ? skl(sks.length) : sks.length ? skl(3) + (sks.length > 3 ? `<button class="loadmore" data-act="skopen">Show all ${sks.length}</button>` : "") : skl(0)}`;
+    return `<h1 class="title">Activity</h1>${chips}${body}`;
   }
 
   function viewCoin(mint) {
@@ -665,9 +721,11 @@
     else if (top && top.kind === "notif") html = viewNotif();
     else if (top && top.kind === "window") html = viewWindow();
     else if (top && top.kind === "starship") html = viewStarship();
+    else if (top && top.kind === "skips") { ensure("skips"); html = viewSkips(); }
+    else if (top && top.kind === "skip") { ensure("skips"); html = viewSkip(top.mint); }
     else if (S.tab === "home") html = viewHome();
-    else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); html = viewBots(); }
-    else if (S.tab === "activity") html = viewActivity();
+    else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); ensure("skips"); html = viewBots(); }
+    else if (S.tab === "activity") { ensure("skips"); html = viewActivity(); }
     else if (S.tab === "account") { ensure("account"); ensure("settings"); html = viewAccount(); }
     const oldBal = $("#bal");     // keep the odometer node across renders so changed digits roll
     view.innerHTML = html;
@@ -706,6 +764,10 @@
     else if (act === "back") history.back();
     else if (act === "range") { S.range = t.dataset.r; await getFile("chart/" + S.range).catch(() => {}); render(); }
     else if (act === "coin" && t.dataset.mint) push({ kind: "coin", mint: t.dataset.mint });
+    else if (act === "skips") push({ kind: "skips" });
+    else if (act === "actf") { localStorage.setItem("desk.actf", t.dataset.f); render(); }
+    else if (act === "skopen") { localStorage.setItem("desk.skopen", localStorage.getItem("desk.skopen") === "1" ? "0" : "1"); render(); }
+    else if (act === "skip" && t.dataset.mint) push({ kind: "skip", mint: t.dataset.mint });
     else if (act === "audit" && t.dataset.mint) push({ kind: "audit", mint: t.dataset.mint });
     else if (act === "settings") { go("account"); setTimeout(() => { const g = document.getElementById("set-" + t.dataset.grp); if (g) g.scrollIntoView(); }, 300); }
     else if (act === "more") { for (let i = 0; i < 10; i++) if (!S.files["activity/" + i]) { await getFile("activity/" + i).catch(() => {}); break; } render(); }
@@ -1434,7 +1496,8 @@
     maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"], timer: ["Buy timer", "Timer started, cancelled, and when it ends"],
     window: ["Trading window", "Window turned on / off, hours changed"],
     starship: ["🚀 Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["🚀 Starship trades", "Each Starship buy, take profit and exit"],
-    viewer: ["👀 Viewer link", "Created, revoked, first opened"] };
+    viewer: ["👀 Viewer link", "Created, revoked, first opened"],
+    skips: ["🔎 Skip summary", "Top skip reasons, every 3 h (only if coins were skipped)"] };
   const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
   function pushEnv() {
