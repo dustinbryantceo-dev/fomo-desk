@@ -44,11 +44,20 @@ const DeskCrypto = (() => {
       screen: async () => new Blob([await file("screen")], { type: "image/jpeg" }),
     };
   }
+  // iOS: a home-screen app has its own storage, separate from Safari. In Safari (not standalone) the #d= link stays in
+  // the URL so "Add to Home Screen" saves it; the standalone app reads it once, keeps it in its own storage, strips it.
+  function isStandalone() {
+    return navigator.standalone === true || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  }
   function dataPath() {
     const m = location.hash.match(/[#&]d=([A-Za-z0-9_-]{32,})/);
-    if (m) { localStorage.setItem("desk.d", m[1]); history.replaceState(null, "", location.pathname); }
+    if (m) {
+      localStorage.setItem("desk.d", m[1]);
+      if (isStandalone()) history.replaceState(null, "", location.pathname);
+    }
     return localStorage.getItem("desk.d");
   }
-  return { open, dataPath };
+  function linkInUrl() { return /[#&]d=[A-Za-z0-9_-]{32,}/.test(location.hash); }
+  return { open, dataPath, isStandalone, linkInUrl };
 })();
 if (typeof module !== "undefined") module.exports = DeskCrypto;

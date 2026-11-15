@@ -104,8 +104,8 @@
   // ---------- views ----------
   function viewGate(kind) {
     if (kind === "nolink") return `<div class="gate"><div class="ico">${ICON.shield}</div><h1>Open your desk link</h1>
-      <p>This phone has no desk link yet. Open the private link from Grok Bot once; it is saved on this phone and removed from the address bar.</p>
-      <p class="ter">Then Share → Add to Home Screen for full screen.</p></div>`;
+      <p>This ${DeskCrypto.isStandalone() ? "home-screen app" : "browser"} has no desk link yet. Open the private link from Grok Bot in Safari, then tap Share → Add to Home Screen on that page: the icon keeps the link.</p>
+      <p class="ter">Added the icon before this fix? Delete it and add it again from the link.</p></div>`;
     return `<div class="gate"><div class="ico">${ICON.search}</div><h1>No data at this link</h1>
       <p>Nothing is published for this link right now. If the desk just started, give it 15 seconds.</p>
       <p>If it stays empty, the link is wrong or old: open the link from Grok Bot again.</p>
@@ -418,9 +418,20 @@
     $("#fclose").onclick = () => { f.hidden = true; f.innerHTML = ""; };
   }
 
+  // ---------- Add to Home Screen hint (Safari only, link still in the URL so the icon keeps it) ----------
+  function showA2hs() {
+    if (document.getElementById("a2hs")) return;
+    const d = document.createElement("div"); d.id = "a2hs";
+    d.innerHTML = `<span>Now tap <b>Share</b> → <b>Add to Home Screen</b>. The icon keeps your private desk link.</span><button aria-label="Close">✕</button>`;
+    d.querySelector("button").onclick = () => { d.remove(); localStorage.setItem("desk.a2hs.off", "1"); };
+    document.body.appendChild(d);
+  }
+
   // ---------- start ----------
   async function start() {
-    S.dp = DeskCrypto.dataPath(); // takes #d= once into localStorage and strips it from the URL bar
+    S.dp = DeskCrypto.dataPath(); // takes #d= into localStorage; strips it only in the home-screen app (iOS storage is separate)
+    S.a2hs = !DeskCrypto.isStandalone() && DeskCrypto.linkInUrl() && localStorage.getItem("desk.a2hs.off") !== "1";
+    if (S.a2hs) showA2hs();
     if (window.__DESK_FIXTURE) return fixture(window.__DESK_FIXTURE);
     if (!S.dp) { render(); return; }
     S.desk = await DeskCrypto.open(S.dp, BASE);

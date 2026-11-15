@@ -195,3 +195,6 @@ h2.sec .count{color:var(--sec);font-weight:400}
 .cp-sw{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px}
 .sw{width:44px;height:26px;border-radius:13px;background:#39393d;position:relative;opacity:.7}.sw i{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:11px;background:#fff}
 .sw.on{background:var(--green)}.sw.on i{left:20px}
+
+#a2hs{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;background:#0a84ff;color:#fff;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#a2hs span{flex:1}#a2hs button{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:12px;width:28px;height:28px;font-size:14px}
