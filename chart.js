@@ -31,8 +31,8 @@ const Charts = (() => {
       g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
       const path = new Path2D(); pts.forEach((p, i) => (i ? path.lineTo(X(p[0]), Y(p[1])) : path.moveTo(X(p[0]), Y(p[1]))));
       const area = new Path2D(path); area.lineTo(X(t1), h); area.lineTo(X(t0), h); area.closePath();
-      const gr = g.createLinearGradient(0, top, 0, h); gr.addColorStop(0, "rgba(0,211,90,0.28)"); gr.addColorStop(1, "rgba(0,211,90,0)");
-      g.fillStyle = gr; g.fill(area);
+      const gr = g.createLinearGradient(0, top, 0, h); const yl = Math.min(...pts.map((p) => Y(p[1]))); const gr2 = g.createLinearGradient(0, yl, 0, Math.min(h, yl + 120)); gr2.addColorStop(0, "rgba(0,211,90,0.22)"); gr2.addColorStop(1, "rgba(0,211,90,0)"); const grUse = gr2;
+      g.fillStyle = grUse; g.fill(area);
       g.strokeStyle = "#00d35a"; g.lineWidth = 2; g.lineJoin = "round"; g.stroke(path);
       const lp = pts[pts.length - 1]; g.fillStyle = "#00d35a"; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 3.5, 0, 7); g.fill();
       // marks: chips above the line; a later mark moves up a row when it would overlap
