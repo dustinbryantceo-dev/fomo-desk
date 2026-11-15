@@ -503,3 +503,9 @@ html.tg .tabbar{padding-bottom:calc(6px + var(--sb))}
 .qrow .btn { margin-left: auto; }
 .tag.loud{color:#ffb547;background:rgba(255,181,71,.13);margin-left:4px}
 .nf .row .t1,.nf .row .t2{white-space:normal;overflow:visible;text-overflow:clip}
+.maint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sb, 0px) + 74px);z-index:40;width:max-content;max-width:calc(100% - 32px);white-space:normal;text-align:center;line-height:1.3;
+  font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:#10212a;color:#8fe3ff;border:1px solid rgba(0,194,255,.35);box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.maint.done{background:#0d2219;color:#00f5a0;border-color:rgba(0,245,160,.35)}
+.maint.failed{background:#2a2112;color:#ffc36b;border-color:rgba(255,166,43,.35)}
+#tghome.hl{outline:2px solid rgba(0,194,255,.6);border-radius:18px}
+#tghome .t1,#tghome .t2{white-space:normal;overflow:visible;text-overflow:clip}

@@ -105,8 +105,21 @@
     const n = Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000));
     el.hidden = false; el.textContent = `Desk on standby · checking again in ${n}s · last update ${S.lastIxT ? hm(S.lastIxT) : "never"}`;
   }
+  // maintenance strip: deskctl writes data/.maint.json, the desk publishes it in state.maint
+  function maintRow() {
+    let el = $("#maint");
+    if (!el) { el = document.createElement("div"); el.id = "maint"; el.className = "maint"; el.hidden = true; el.setAttribute("role", "status"); document.body.appendChild(el);
+      el.onclick = () => { if (el.dataset.k !== "updating") { S.maintSeen = el.dataset.ts; el.hidden = true; } }; }
+    const m = S.state && S.state.maint;
+    if (!m || (m.state !== "updating" && S.maintSeen === String(m.ts))) { el.hidden = true; return; }
+    const left = m.eta_ts ? Math.ceil((m.eta_ts * 1000 - Date.now()) / 60000) : null;
+    const txt = m.state === "updating" ? `🛠️ Updating… ${m.what || "Pump Pilot"} · ${left == null ? "back soon" : left > 0 ? `back in ~${left} min` : "almost done"}`
+      : m.state === "done" ? `Updated ✓${m.version ? " · " + m.version : ""}` : "⚠️ Update not confirmed · the desk is being checked";
+    el.className = "maint " + m.state; el.dataset.k = m.state; el.dataset.ts = String(m.ts);
+    if (el.textContent !== txt) el.textContent = txt; el.hidden = false;
+  }
   function badgeTick() { const b = $("#mbadge"); if (b) { const h = modeBadge(); if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; } } }
-  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); }, 1000);
+  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); maintRow(); }, 1000);
 
   // ---------- views ----------
   function viewGate(kind) {
@@ -550,6 +563,7 @@
         <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite · copy traders on/off · withdraw</div></div><span class="ter">›</span></button>
         <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
       </div>` : ""}
+      ${S.tg ? `<div class="grp">Home Screen</div>${tgHomeRow()}` : ""}
       <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
       <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
@@ -661,6 +675,8 @@
     else if (act === "quietsw") prefSwitch({ quiet: { on: !(S.nf && S.nf.prefs && S.nf.prefs.quiet.on) } });
     else if (act === "quietsave") { const a = $("#qstart"), b = $("#qend"); if (a && b) prefSwitch({ quiet: { start: a.value, end: b.value } }, "Quiet hours saved"); }
     else if (act === "tgsw") tgSwitch();
+    else if (act === "maintloud") prefSwitch({ maint_loud: !(S.nf && S.nf.prefs && S.nf.prefs.maint_loud) });
+    else if (act === "tga2hs") tgAddHome();
     else if (act === "p2invite") { const l = S.social && S.social.invite && S.social.invite[0]; if (l) { if (navigator.share) { try { await navigator.share({ title: "FOMO", url: l.url }); } catch {} } else { try { await navigator.clipboard.writeText(l.url); toast("Link copied"); } catch { toast(l.url); } } } }
     else if (act === "invite") invite();
     else if (act === "closesheet") closeSheet();
@@ -1144,7 +1160,8 @@
   // iPhone: push only works in the home-screen app (iOS 16.4+), and the permission prompt needs a tap.
   const EVLAB = { buy: ["Buy filled", "A bot or you bought"], exit: ["Sell / exit", "Trail, time or manual exit"], tp: ["Take profit", "First take profit hit"], stop: ["Stop loss", "Stopped out"],
     report: ["Night report", "Night over, morning report"], desk_down: ["Desk down / STANDBY", "No heartbeat for 2 min, and back up"], risk_pause: ["Risk pause", "Buys stopped by a risk rule"],
-    lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"] };
+    lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"],
+    maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"] };
   const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
   function pushEnv() {
@@ -1165,9 +1182,16 @@
     if (r.status === 200) Object.assign(S.nf, { prefs: r.j.prefs, devices: r.j.devices, key: r.j.vapid_public_key, loud: r.j.loud || [] });
     render(true);
   }
+  // Telegram 8.0+: addToHomeScreen() makes a Telegram shortcut (opens the Mini App; no iPhone notifications from it)
+  const tgCanHome = () => { try { return !!(S.tg && S.tg.addToHomeScreen && (!S.tg.isVersionAtLeast || S.tg.isVersionAtLeast("8.0"))); } catch { return false; } };
+  function tgAddHome() {
+    if (!tgCanHome()) return toast("This Telegram can't add shortcuts. Use /install for the real app.");
+    try { S.tg.onEvent && S.tg.onEvent("homeScreenAdded", () => toast("Shortcut added")); S.tg.addToHomeScreen(); } catch { toast("Telegram didn't add it. Use /install instead."); }
+  }
+  const tgHomeRow = () => S.tg ? `<div class="list plain" id="tghome"><div class="row"><div class="tx"><div class="t1">Add to Home Screen</div><div class="t2">${tgCanHome() ? "A Telegram shortcut: opens Pump Pilot inside Telegram, so it can't show iPhone notifications. For notifications send /install and add the Safari app." : "This Telegram can't make shortcuts. Send /install in the chat for the real home-screen app."}</div></div>${tgCanHome() ? `<button class="btn sm" data-act="tga2hs">Add</button>` : ""}</div></div>` : "";
   function envNote(env) {
     const N = {
-      telegram: ["Telegram's in-app browser can't show notifications", "Open Pump Pilot from its icon on your Home Screen, then Account → Notifications → Enable. Your settings below still work from here."],
+      telegram: ["Telegram's in-app browser can't show notifications", "Open Pump Pilot from its icon on your Home Screen, then Account → Notifications → Enable. No icon yet? Send /install in the Telegram chat. Your settings below still work from here."],
       iostab: ["Notifications need the home-screen app", "On iPhone, Safari tabs can't get push. In Safari tap Share → Add to Home Screen, then open Pump Pilot from that icon and come back here. (Already added? Open it from the icon, not from Safari.)"],
       unsupported: ["This browser can't do web push", "On iPhone you need iOS 16.4 or newer and the home-screen app. Telegram alerts keep working meanwhile."],
       denied: ["Notifications are blocked for Pump Pilot", "iPhone: Settings → Notifications → Pump Pilot → Allow Notifications, then come back and tap Enable."] }[env];
@@ -1186,11 +1210,12 @@
     const ev = p ? Object.keys(EVLAB).map((k) => `<div class="row"><div class="tx"><div class="t1">${esc(EVLAB[k][0])}${(n.loud || []).includes(k) ? ' <span class="tag loud">rings in quiet hours</span>' : ""}</div><div class="t2">${esc(EVLAB[k][1])}</div></div>${sw(p.events[k], "evsw", `data-e="${k}"`, EVLAB[k][0])}</div>`).join("") : "";
     return backBar("Account") + `<div class="nf"><h1 class="title">Notifications</h1>
       ${n && n.err ? `<div class="p2note warn">${esc(n.err)}</div>` : ""}
-      <div class="grp">This phone</div>${top}
+      <div class="grp">This phone</div>${top}${env === "telegram" ? tgHomeRow() : ""}
       <div class="p2msg ro" id="nfmsg"></div>
       ${p ? `<div class="grp">Events</div><div class="list plain">${ev}</div>
       <div class="grp">Quiet hours</div><div class="list plain">
         <div class="row"><div class="tx"><div class="t1">Quiet hours</div><div class="t2">${p.quiet.on ? `On · ${esc(p.quiet.start)}–${esc(p.quiet.end)} (Italy time) · only desk down, lockout and alerts ring` : "Off"}</div></div>${sw(p.quiet.on, "quietsw", "", "Quiet hours")}</div>
+        <div class="row"><div class="tx"><div class="t1">Updates ring in quiet hours</div><div class="t2">${p.maint_loud ? "On: maintenance notices ring even in quiet hours" : "Off: maintenance notices stay silent in quiet hours"}</div></div>${sw(p.maint_loud, "maintloud", "", "Updates ring in quiet hours")}</div>
         <div class="row qrow"><label>From <input type="time" id="qstart" value="${esc(p.quiet.start)}"></label><label>to <input type="time" id="qend" value="${esc(p.quiet.end)}"></label><button class="btn sm" data-act="quietsave">Save</button></div></div>
       <div class="grp">Telegram</div><div class="list plain">
         <div class="row"><div class="tx"><div class="t1">Telegram alerts</div><div class="t2">${p.telegram ? "On: Telegram gets the desk's messages as before" : "Off: only this app is notified. Telegram commands still work."}</div></div>${sw(p.telegram, "tgsw", "", "Telegram alerts")}</div></div>
@@ -1236,6 +1261,7 @@
     if (upd.events) Object.assign(S.nf.prefs.events, upd.events);
     if (upd.quiet) Object.assign(S.nf.prefs.quiet, upd.quiet);
     if ("telegram" in upd) S.nf.prefs.telegram = upd.telegram;
+    if ("maint_loud" in upd) S.nf.prefs.maint_loud = upd.maint_loud;
     render(true);
     const r = await api("/api/push/prefs", upd);
     if (r.status === 200 && r.j.prefs) { S.nf.prefs = r.j.prefs; render(true); if (okMsg) toast(okMsg); }
@@ -1253,11 +1279,15 @@
   const TABS = ["home", "bots", "activity", "account"];
   function tabFromUrl() {
     const q = new URLSearchParams(location.search), t = q.get("tab"); if (!t) return;
+    if (q.get("a2hs")) { S.wantA2hs = true; q.delete("a2hs"); }
     q.delete("tab"); history.replaceState(history.state, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     if (TABS.includes(t)) S.wantTab = t;
   }
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { const t = e.data && e.data.tab; if (e.data && e.data.type === "pp-open" && TABS.includes(t)) { if (S.state) go(t); else S.wantTab = t; } });
-  function applyWantTab() { if (S.wantTab && S.state) { const t = S.wantTab; S.wantTab = null; if (t !== S.tab) go(t); } }
+  function applyWantTab() {
+    if (S.wantTab && S.state) { const t = S.wantTab; S.wantTab = null; if (t !== S.tab) go(t); }
+    if (S.wantA2hs) { S.wantA2hs = false; setTimeout(() => { const r = $("#tghome"); if (r) { r.scrollIntoView({ block: "center" }); r.classList.add("hl"); } }, 400); }
+  }
 
   // ---------- start ----------
   // ---------- Telegram Mini App: telegram-web-app.js only when we are inside Telegram ----------
