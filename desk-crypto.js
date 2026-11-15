@@ -49,7 +49,14 @@ const DeskCrypto = (() => {
   function isStandalone() {
     return navigator.standalone === true || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   }
+  // &t= is the control token for the desk API (Account mode toggle). Same route as #d=: read from the link once, kept
+  // only in this device's storage, stripped from the URL in the home-screen app, never logged or sent anywhere but the API.
+  function takeToken() {
+    const t = location.hash.match(/[#&]t=([A-Za-z0-9_-]{32,})/);
+    if (t) localStorage.setItem("desk.t", t[1]);
+  }
   function dataPath() {
+    takeToken();
     const m = location.hash.match(/[#&]d=([A-Za-z0-9_-]{32,})/);
     if (m) {
       localStorage.setItem("desk.d", m[1]);
@@ -57,7 +64,8 @@ const DeskCrypto = (() => {
     }
     return localStorage.getItem("desk.d");
   }
+  function appToken() { takeToken(); return localStorage.getItem("desk.t"); }
   function linkInUrl() { return /[#&]d=[A-Za-z0-9_-]{32,}/.test(location.hash); }
-  return { open, dataPath, isStandalone, linkInUrl };
+  return { open, dataPath, appToken, isStandalone, linkInUrl };
 })();
 if (typeof module !== "undefined") module.exports = DeskCrypto;

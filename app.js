@@ -42,6 +42,7 @@
       try { fxDiff(ix.state, S.files["activity/0"]); } catch {}
       if (ix.files.screen && ix.files.screen !== S.screenVer) loadScreen(ix.files.screen);
     } catch (e) { S.err = e.status === 404 || /no index/.test(e.message) ? "nodata" : "offline"; }
+    if (S.tab === "account" && !S.stack.length) await ctlPoll();
     S.firstTry = false; S.retryAt = Date.now() + POLL_S * 1000;
     render(true);
   }
@@ -75,7 +76,8 @@
   }
 
   // ---------- router ----------
-  function go(tab) { const moved = tab !== S.tab || S.stack.length; S.tab = tab; S.stack = []; document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab)); render(); scrollTo(0, 0); if (moved) slideIn(); }
+  function go(tab) { if (tab === "account" && tab !== S.tab) ctlPoll().then(() => { if (S.tab === "account") render(true); });
+    const moved = tab !== S.tab || S.stack.length; S.tab = tab; S.stack = []; document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab)); render(); scrollTo(0, 0); if (moved) slideIn(); }
   function slideIn() { const v = $("#view"); if (!v || reduce()) return; v.classList.remove("vin"); void v.offsetWidth; v.classList.add("vin"); clearTimeout(slideIn.t); slideIn.t = setTimeout(() => v.classList.remove("vin"), 320); }
   function push(view) { S.stack.push(view); history.pushState({ d: S.stack.length }, ""); render(); scrollTo(0, 0); slideIn(); }
   addEventListener("popstate", () => { if (S.stack.length) { S.stack.pop(); render(); } });
@@ -524,11 +526,13 @@
       return `<div class="set"><div class="top"><span class="k">${esc(k)}</span><input type="number" value="${esc(v)}" disabled></div>
         <input type="range" min="${esc(r.min)}" max="${esc(r.max)}" step="${r.type === "int" ? 1 : "any"}" value="${esc(v)}" disabled></div>`;
     };
+    const md = curMode();
     return `<h1 class="title">Account</h1>
       <div class="modeseg" role="radiogroup" aria-label="Trading mode">
-        <button role="radio" aria-checked="${ac.mode === "PAPER"}" class="${ac.mode === "PAPER" ? "on paper" : ""}" data-act="mode" data-m="PAPER">🧪 PAPER</button>
-        <button role="radio" aria-checked="${ac.mode === "LIVE"}" class="${ac.mode === "LIVE" ? "on live" : ""}" data-act="mode" data-m="LIVE">🟢 LIVE</button></div>
-      <div class="ro">Mode from the desk: <b>${esc(ac.mode)}</b>. ${ac.mode === "LIVE" ? "Real money." : "No real money."}</div>
+        <button role="radio" aria-checked="${md === "PAPER"}" class="${md === "PAPER" ? "on paper" : ""}" data-act="mode" data-m="PAPER">🧪 PAPER</button>
+        <button role="radio" aria-checked="${md === "LIVE"}" class="${md === "LIVE" ? "on live" : ""}" data-act="mode" data-m="LIVE">🟢 LIVE</button></div>
+      <div class="ro">Mode from the desk: <b>${esc(md)}</b>. ${md === "LIVE" ? "Real money." : "No real money."}</div>
+      ${ctlRow()}
       <div class="grp">Cash</div><div class="list plain"><div class="row"><div class="tx"><div class="t1">${money(ac.cash)}</div><div class="t2">${ac.mode === "PAPER" ? `PAPER start cash ${money(ac.paper_start_cash)}` : "from FOMO /balances"}</div></div></div></div>
       <div class="grp">FOMO</div><div class="list plain">
         ${fomoLink(ac.profile_url) ? `<a class="row" href="${esc(ac.profile_url)}" target="_blank" rel="noopener noreferrer"><div class="tx"><div class="t1">Your FOMO profile</div><div class="t2">@${esc(ac.fomo_handle)}</div></div><span class="ter">›</span></a>` : ""}
@@ -652,13 +656,58 @@
     });
   }
   // ---------- PAPER / LIVE switch sheet ----------
-  // Plan B hosting: the phone can't reach the desk (no public port), so this sheet sends nothing; it says so plainly.
-  const MODE_SEND = null;      // set to a real sender once the desk has an approved, authenticated mode endpoint
+  // Control endpoint on the desk (Caddy :443 -> 127.0.0.1). Phase 1 only: GET /api/status, POST /api/mode.
+  // The token comes from the &t= link (DeskCrypto.appToken), lives only in this device's storage, goes only in the
+  // Authorization header to API, and is never shown, logged or put in a URL.
+  const API = "https://178-104-3-124.sslip.io";
+  S.ctl = { st: "idle", s: null, at: 0 };
+  async function ctlFetch(path, body) {
+    const tok = DeskCrypto.appToken(); if (!tok) { const e = new Error("notoken"); e.code = "notoken"; throw e; }
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 10000);
+    try {
+      const r = await fetch(API + path, { method: body ? "POST" : "GET", mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal,
+        headers: Object.assign({ Authorization: "Bearer " + tok }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined });
+      let j = {}; try { j = await r.json(); } catch {}
+      return { status: r.status, j };
+    } finally { clearTimeout(tm); }
+  }
+  async function ctlPoll() {
+    if (!DeskCrypto.appToken()) { S.ctl.st = "notoken"; return; }
+    try {
+      const { status, j } = await ctlFetch("/api/status");
+      S.ctl.st = status === 200 ? (j.desk_up ? "ok" : "deskdown") : status === 401 ? "badtoken" : status === 429 ? "locked" : "down";
+      if (status === 200) { S.ctl.s = j; S.ctl.at = Date.now(); }
+    } catch { S.ctl.st = "down"; }
+  }
+  function ctlRow() {
+    const c = S.ctl, s = c.s;
+    const map = { ok: ["ok", "Connected to desk", s ? `Checked ${hm(c.at / 1000)} · ${s.live_unlocked ? "LIVE unlocked on the server" : "LIVE locked on the server"}` : ""],
+      deskdown: ["warn", "Desk unreachable", "The control service answered, but the desk itself isn't running"],
+      down: ["bad", "Desk unreachable", "No answer from the desk. Check the connection and try again"],
+      badtoken: ["bad", "Desk refused this device", "The control token on this phone is wrong or old. Open the new link"],
+      locked: ["bad", "Desk unreachable", "Too many tries: the desk is ignoring this device for a few minutes"],
+      notoken: ["mut", "No control token on this device", "Open your Pump Pilot link with the control token to switch mode from here"],
+      idle: ["mut", "Checking the desk…", ""] }[c.st] || ["mut", "Checking the desk…", ""];
+    let extra = "";
+    if (s && c.st === "ok") {
+      if (s.switch_pending) extra = `Switching to ${esc(s.switch_pending)}: ${s.open_positions || s.in_flight ? `${s.open_positions} open ${s.running_mode} position${s.open_positions === 1 ? "" : "s"} still managed; the desk restarts into ${esc(s.switch_pending)} when ${s.open_positions === 1 ? "it closes" : "they close"}` : "the desk is restarting now"}`;
+      else if (s.hold_until && s.hold_until * 1000 > Date.now()) extra = `LIVE hold: first live buy in ${Math.ceil(s.hold_until - Date.now() / 1000)} s`;
+    }
+    return `<div class="list plain ctl" id="ctlrow"><div class="row"><span class="cdot ${map[0]}"></span><div class="tx"><div class="t1">${map[1]}</div><div class="t2">${esc(map[2])}</div>${extra ? `<div class="t2 pend">${extra}</div>` : ""}</div></div></div>`;
+  }
+  async function MODE_SEND(to, confirm) {
+    const { status, j } = await ctlFetch("/api/mode", to === "LIVE" ? { mode: to, confirm } : { mode: to });
+    return { status, ok: status === 200 && j.ok, mode: j.mode, changed: j.changed, locked: status === 409, error: j.error };
+  }
   function setv(key) { const g = (S.files.settings || {}).groups || {}; for (const rows of Object.values(g)) for (const r of rows) if (r.key === key) return r.value; return null; }
+  function curMode() { return (S.ctl.s && S.ctl.st === "ok" && S.ctl.s.mode) || (S.files.account && S.files.account.mode) || (S.state && S.state.mode); }
   function openMode(to) {
-    const cur = (S.files.account && S.files.account.mode) || (S.state && S.state.mode); if (!to || to === cur) return;
+    const cur = curMode(); if (!to || to === cur) return;
+    if (!DeskCrypto.appToken()) { S.ctl.st = "notoken"; render(); toast("No control token on this device"); return; }
+    const cs = S.ctl.st === "ok" ? S.ctl.s : null;
     const sh = $("#sheet"), live = to === "LIVE";
-    const rp = setv("brain.risk_per_trade_pct"), mn = setv("brain.min_ticket_usd"), mx = setv("brain.max_ticket_usd"), nl = setv("risk.night_loss_stop_pct"), sp = setv("risk.stop_pct");
+    const pb = (cs && cs.per_buy) || {}, lc = (cs && cs.loss_cap) || {};
+    const rp = pb.risk_pct ?? setv("brain.risk_per_trade_pct"), mn = pb.min_usd ?? setv("brain.min_ticket_usd"), mx = pb.max_usd ?? setv("brain.max_ticket_usd"), nl = lc.night_loss_stop_pct ?? setv("risk.night_loss_stop_pct"), sp = lc.stop_pct ?? setv("risk.stop_pct");
     const nsb = S.state && S.state.night_start_balance;
     sh.innerHTML = `<div class="in"><div class="grab"></div><div style="font:700 20px var(--disp);margin-bottom:6px">${live ? "🟢 Switch to LIVE" : "🧪 Switch to PAPER"}</div>
       ${live ? `<div class="mrows">
@@ -670,16 +719,27 @@
         <input id="livein" class="livein" placeholder="Type LIVE" autocomplete="off" autocapitalize="characters" spellcheck="false">`
       : `<div class="ro" style="margin:4px 0 6px">Instant. Open positions keep being managed (stops, take profit, trail) until they close; new buys are paper.</div>`}
       <button class="btn ${live ? "red" : "primary"} dis" id="modego" style="width:100%;margin-top:12px" disabled>${live ? "Switch to LIVE" : "Switch to PAPER"}</button>
-      <div class="ro" id="modemsg" style="margin-top:10px">${MODE_SEND ? "" : "Not connected yet: this app can't reach the desk, so switching from here is off. Nothing was sent."}</div>
+      <div class="ro modemsg" id="modemsg" style="margin-top:10px">${cs ? "" : "The desk hasn't answered yet: you can still try, the desk checks everything itself."}</div>
       <button class="btn" style="width:100%;margin-top:12px" data-act="closesheet">Close</button></div>`;
     sh.hidden = false; sh.onclick = (e) => { if (e.target === sh) sh.hidden = true; };
     const go = $("#modego"), inp = $("#livein");
-    const ready = () => !!MODE_SEND && (!live || (inp && inp.value === "LIVE"));
+    const ready = () => !live || (inp && inp.value === "LIVE");
     const upd = () => { const ok = ready(); go.disabled = !ok; go.classList.toggle("dis", !ok); };
     if (inp) inp.addEventListener("input", upd); upd();
-    go.onclick = async () => { if (!ready()) return; go.disabled = true;
-      try { const r = await MODE_SEND(to); $("#modemsg").textContent = r && r.ok ? `Switched to ${to}` : r && r.locked ? "Live is locked on the server" : "Not switched"; }
-      catch { $("#modemsg").textContent = "Not switched: the desk didn't answer"; } };
+    const msg = (t, k) => { const m = $("#modemsg"); m.textContent = t; m.dataset.k = k || ""; };
+    go.onclick = async () => { if (!ready()) return; go.disabled = true; go.classList.add("dis"); go.textContent = "Switching…"; msg("Switching…", "busy");
+      let r = null;
+      try { r = await MODE_SEND(to, live ? inp.value : undefined); } catch { r = null; }
+      if (r && r.ok) {
+        await ctlPoll(); const s = S.ctl.s || {};
+        go.textContent = "Done ✓";
+        msg(live ? `Switched to LIVE. ${s.switch_pending ? "The desk restarts into LIVE as soon as nothing is in flight; " : ""}first live buy 60 s after the switch. Telegram confirms.`
+          : `Switched to PAPER. No new live buys from now; ${s.open_positions ? `${s.open_positions} open LIVE position${s.open_positions === 1 ? " is" : "s are"} still managed until closed` : "the desk restarts into PAPER in a moment"}. Telegram confirms.`, "ok");
+        render(); return;
+      }
+      go.textContent = live ? "Switch to LIVE" : "Switch to PAPER";
+      msg(!r ? "Network error: the desk didn't answer. Nothing changed; try again." : r.locked ? "Live is locked on the server" : r.status === 401 ? "The desk refused this device's token. Nothing changed." : r.status === 429 ? "Too many tries: wait a few minutes. Nothing changed." : r.error === "confirm_required" ? "Type LIVE to confirm" : "Not switched. Nothing changed.", "err");
+      upd(); };
   }
   function openSell(mint) {
     const c = S.files["coin/" + mint] || {}, s = sym(c.symbol, mint), sh = $("#sheet");
