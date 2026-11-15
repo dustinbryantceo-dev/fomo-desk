@@ -1,0 +1,166 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07090f"><title>Pump Pilot · Desk Guide</title>
+<style>
+:root{--bg:#07090f;--panel:rgba(255,255,255,.035);--line:rgba(255,255,255,.08);--txt:#eef2f7;--mut:#8b97a8;--gold:#ffc83d;--grn:#22e584;--red:#ff4d6d;--blu:#4da3ff;--pur:#a78bfa;--cyn:#2ee6d6;--org:#ff8a3d}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;color:var(--txt);font:16px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;
+background:radial-gradient(1200px 600px at 10% -10%,rgba(34,229,132,.13),transparent 60%),radial-gradient(900px 500px at 100% 0%,rgba(255,200,61,.10),transparent 60%),radial-gradient(800px 600px at 50% 120%,rgba(167,139,250,.10),transparent 60%),var(--bg);background-attachment:fixed}
+main{max-width:920px;margin:0 auto;padding:0 16px 80px}
+.hero{position:relative;text-align:center;padding:56px 16px 34px}
+.logo{display:inline-grid;place-items:center;width:74px;height:74px;border-radius:22px;font-size:38px;background:linear-gradient(135deg,#22e584,#ffc83d);box-shadow:0 0 0 1px rgba(255,255,255,.15) inset,0 18px 50px -10px rgba(34,229,132,.55);animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-6px)}}
+h1{margin:18px 0 4px;font-size:clamp(2.2rem,7vw,3.4rem);letter-spacing:-.03em;font-weight:800;line-height:1.05;background:linear-gradient(90deg,#fff,#22e584 45%,#ffc83d);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mut);font-size:1.05rem;margin:0}
+.pills{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:18px}
+.pill{font:600 .78rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+.pill.live{color:var(--grn);border-color:rgba(34,229,132,.4);box-shadow:0 0 18px -4px rgba(34,229,132,.6)}
+.pill.live:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--grn);margin-right:7px;vertical-align:1px;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.25}}
+nav a,.cta{cursor:pointer;-webkit-tap-highlight-color:rgba(34,229,132,.25)}nav{position:sticky;top:0;z-index:5;margin:0 -16px 8px;padding:10px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;background:rgba(7,9,15,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+nav::-webkit-scrollbar{display:none}
+nav a{flex:none;color:var(--txt);text-decoration:none;font-size:.86rem;font-weight:600;padding:7px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--line)}
+nav a:hover{border-color:var(--c,var(--grn))}
+section{--c:var(--grn);position:relative;margin:22px 0;padding:22px 20px 20px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid var(--line);overflow:hidden;scroll-margin-top:70px}
+section:before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--c),transparent)}
+section:after{content:"";position:absolute;width:260px;height:260px;right:-90px;top:-120px;border-radius:50%;background:var(--c);opacity:.07;filter:blur(30px);pointer-events:none}
+.h{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ic{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:13px;font-size:21px;background:color-mix(in srgb,var(--c) 16%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+h2{margin:0;font-size:1.3rem;letter-spacing:-.01em}
+.kick{display:block;font:700 .7rem/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--c);margin-bottom:4px}
+h3{font-size:1rem;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+p{margin:8px 0}.mut{color:var(--mut);font-size:.92rem}
+a{color:var(--blu)}
+code{font:.86em ui-monospace,"SF Mono",Menlo,Consolas,monospace;padding:2px 7px;border-radius:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);color:#e7f6ee;word-break:break-word}
+.bots{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
+.bot{padding:12px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--line)}
+.bot b{display:block;font-size:.98rem}.bot span{color:var(--mut);font-size:.86rem}
+.cmds{display:grid;gap:8px}
+.cmd{display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:12px;align-items:start;padding:11px 12px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
+.cmd .k{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.cmd .d{color:#cdd5e0;font-size:.94rem}
+.grp{font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:16px 2px 4px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.st{--k:var(--grn);position:relative;padding:16px;border-radius:16px;background:rgba(0,0,0,.3);border:1px solid color-mix(in srgb,var(--k) 35%,transparent);box-shadow:0 0 28px -14px var(--k)}
+.st .v{font:800 1.55rem/1.1 ui-sans-serif,-apple-system,sans-serif;letter-spacing:-.02em;color:var(--k)}
+.st .l{font-weight:700;margin-top:6px}.st .s{color:var(--mut);font-size:.85rem}
+.st.r{--k:var(--red)}.st.g{--k:var(--gold)}.st.b{--k:var(--blu)}.st.p{--k:var(--pur)}
+.tbl{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:1.2fr 1.4fr .9fr;gap:10px;align-items:center;padding:11px 12px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
+.row.hd{background:none;border:none;padding:0 12px;color:var(--mut);font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase}
+.row .now{color:var(--mut);font-size:.85rem;display:block}
+.chip{display:inline-block;font:600 .78rem/1 ui-monospace,monospace;padding:6px 9px;border-radius:8px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}
+ol,ul{margin:6px 0;padding-left:0;list-style:none;counter-reset:n}
+ol li,ul li{position:relative;padding:8px 0 8px 40px;border-bottom:1px dashed var(--line)}ol li:last-child,ul li:last-child{border:0}
+ol li:before{counter-increment:n;content:counter(n);position:absolute;left:0;top:7px;width:27px;height:27px;border-radius:9px;display:grid;place-items:center;font:800 .85rem/1 ui-monospace,monospace;color:#07090f;background:var(--c)}
+ul li:before{content:"";position:absolute;left:11px;top:17px;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+.cta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0;padding:14px 16px;border-radius:14px;text-decoration:none;color:var(--txt);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 22%,transparent),rgba(0,0,0,.2));border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.cta b{font-size:1.02rem}.cta span{color:var(--c);font-weight:700}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.box{padding:14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
+.box .big{font:800 1.8rem/1 ui-sans-serif,sans-serif;color:var(--c)}
+.alert{padding:12px 14px;border-radius:12px;background:rgba(255,200,61,.08);border:1px solid rgba(255,200,61,.3);color:#ffe3a1;font-size:.92rem}
+footer{text-align:center;color:var(--mut);font-size:.85rem;margin-top:30px}
+.s-tg{--c:var(--blu)}.s-rules{--c:var(--red)}.s-chg{--c:var(--gold)}.s-app{--c:var(--grn)}.s-scr{--c:var(--cyn)}.s-use{--c:var(--pur)}.s-safe{--c:var(--org)}.s-fix{--c:var(--mut)}
+@media(max-width:620px){.cmd{grid-template-columns:1fr;gap:6px}.row{grid-template-columns:1fr 1fr}.row .ok{grid-column:1/-1}.row.hd{display:none}.duo{grid-template-columns:1fr}section{padding:20px 16px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+@media print{body{background:#07090f;-webkit-print-color-adjust:exact;print-color-adjust:exact}nav{display:none}section{break-inside:avoid}}
+</style></head><body><main>
+<header class="hero"><div class="logo">🚀</div><h1>Pump Pilot</h1><p class="sub">FOMO Trading Desk · Operator's Guide</p>
+<div class="pills"><span class="pill live">Live</span><span class="pill">5 bots</span><span class="pill">24/7</span><span class="pill">Telegram control</span></div></header>
+<nav><a href="#what">🤖 Bots</a><a href="https://t.me/DaddyDK_fomodesk_bot" target="_blank" rel="noopener">💬 Telegram ↗</a><a href="#rules">🛡️ Rules</a><a href="#change">🎛️ Change rules</a><a href="https://dustinbryantceo-dev.github.io/fomo-desk/" target="_blank" rel="noopener">📊 Web app ↗</a><a href="http://127.0.0.1:6080/vnc.html?autoconnect=1&amp;resize=scale" target="_blank" rel="noopener">🖥️ Live screen ↗</a><a href="grokbot://app/v1/settings?id=usage">⚡ Usage ↗</a><a href="#safety">🔒 Safety</a><a href="#trouble">🧰 Fixes</a></nav>
+
+<section id="what"><div class="h"><div class="ic">🤖</div><div><span class="kick">Overview</span><h2>The five bots</h2></div></div>
+<p>Five bots trade meme coins on FOMO around the clock from a Hetzner server at <code>178.104.3.124</code>. You control them from Telegram.</p>
+<div class="bots"><div class="bot"><b>🔭 Scanner</b><span>Finds new coins</span></div><div class="bot"><b>🧪 Analyst</b><span>Scores each coin</span></div><div class="bot"><b>🧠 Brain</b><span>Decides the size</span></div><div class="bot"><b>⚡ Executor</b><span>Clicks Buy and Sell</span></div><div class="bot"><b>🛡️ Risk</b><span>Enforces the stops</span></div></div></section>
+
+<section id="tg" class="s-tg"><div class="h"><div class="ic">💬</div><div><span class="kick">Control</span><h2>Telegram · @DaddyDK_fomodesk_bot</h2></div></div>
+<p class="mut">These only work from the owner's chat. Type them as plain messages. Only the <code>/time</code> commands need a slash. <b>X</b> is a coin's name, symbol or mint address.</p>
+<a class="cta" href="https://t.me/DaddyDK_fomodesk_bot" target="_blank" rel="noopener"><b>💬 Open @DaddyDK_fomodesk_bot</b><span>Telegram app →</span></a>
+<p class="mut">Not opening? Use the web link: <a href="https://t.me/DaddyDK_fomodesk_bot" target="_blank" rel="noopener">t.me/DaddyDK_fomodesk_bot</a></p>
+<div class="grp">📡 Check in</div><div class="cmds">
+<div class="cmd"><div class="k"><code>help</code></div><div class="d">Lists every command</div></div>
+<div class="cmd"><div class="k"><code>status</code></div><div class="d">Shows bot health, Chrome, the FOMO session, and tonight's counts</div></div>
+<div class="cmd"><div class="k"><code>report</code></div><div class="d">Sends tonight's results</div></div>
+<div class="cmd"><div class="k"><code>why X</code></div><div class="d">Explains why a coin was bought or skipped</div></div></div>
+<div class="grp">💸 Buy &amp; sell</div><div class="cmds">
+<div class="cmd"><div class="k"><code>buy X</code></div><div class="d">Buys a coin by hand. It asks you to confirm first</div></div>
+<div class="cmd"><div class="k"><code>sell X 25</code> · <code>50</code> · <code>100</code></div><div class="d">Sells that % of a position. It asks you to confirm first</div></div>
+<div class="cmd"><div class="k"><code>withdraw $N</code></div><div class="d">Starts a withdrawal. <b>You</b> press Confirm and type the 2FA code yourself</div></div></div>
+<div class="grp">🕹️ Bots &amp; mode</div><div class="cmds">
+<div class="cmd"><div class="k"><code>pause Scanner</code><br><code>resume Scanner</code></div><div class="d">Pauses or resumes any one bot. Risk can't be paused while a position is open</div></div>
+<div class="cmd"><div class="k"><code>paper</code> · <code>live</code></div><div class="d">Shows or switches the mode. LIVE needs you to type <code>LIVE</code></div></div>
+<div class="cmd"><div class="k"><code>set stop to -20%</code></div><div class="d">Changes any setting by name, after you confirm (see <a href="#change">Change rules</a>)</div></div>
+<div class="cmd"><div class="k"><code>picks</code> · <code>copy on|off &lt;handle&gt;</code></div><div class="d">Copy-picks from other callers (currently off)</div></div>
+<div class="cmd"><div class="k"><code>invite</code></div><div class="d">Shows your invite info</div></div></div>
+<div class="grp">🌙 Trading window</div><div class="cmds">
+<div class="cmd"><div class="k"><code>/time</code></div><div class="d">Shows whether the window is on</div></div>
+<div class="cmd"><div class="k"><code>/time off</code></div><div class="d">Pauses the window, so it trades 24/7 with no morning sell-off</div></div>
+<div class="cmd"><div class="k"><code>/time on</code></div><div class="d">Turns the window back on (22:00 to 09:30)</div></div></div></section>
+
+<section id="rules" class="s-rules"><div class="h"><div class="ic">🛡️</div><div><span class="kick">Risk engine</span><h2>Trading rules</h2></div></div>
+<div class="stats">
+<div class="st r"><div class="v">−15%</div><div class="l">🛑 Stop loss</div><div class="s">Sells the trade</div></div>
+<div class="st g"><div class="v">2× → sell 50%</div><div class="l">💰 Take profit</div><div class="s">Banks half when a coin doubles</div></div>
+<div class="st r"><div class="v">−40% from peak</div><div class="l">📉 Trailing stop</div><div class="s">Sells the rest if it falls back</div></div>
+<div class="st b"><div class="v">3h · under +5%</div><div class="l">⏱️ Time-out</div><div class="s">Closes a position that isn't moving</div></div>
+<div class="st p"><div class="v">55% of start</div><div class="l">🧯 Nightly loss stop</div><div class="s">Stops new buys, doesn't sell</div></div>
+<div class="st"><div class="v">30</div><div class="l">🔢 Max trades</div><div class="s">Per night</div></div></div>
+<ul style="margin-top:14px"><li><b>Trading window:</b> saved as 22:00 to 09:30 Berlin time, but <b>paused right now</b>, so it trades 24/7. Use <code>/time on</code> to bring it back. The "night" resets at 22:00 either way.</li>
+<li><b>How the stops work:</b> Risk checks every position every 5 seconds. The desk enforces these stops itself; they aren't orders placed on FOMO.</li><li><b>Mode:</b> LIVE (real money).</li></ul></section>
+
+<section id="change" class="s-chg"><div class="h"><div class="ic">🎛️</div><div><span class="kick">Tuning</span><h2>Changing the rules</h2></div></div>
+<p>Send these in Telegram. Each one shows the old and new value and asks you to confirm before it changes. Out-of-range values are refused.</p>
+<div class="tbl"><div class="row hd"><div>Rule</div><div>Message to send</div><div>Allowed</div></div>
+<div class="row"><div>🛑 Stop loss<span class="now">now 15%</span></div><div><code>set stop to 20%</code></div><div class="ok"><span class="chip">1 to 90%</span></div></div>
+<div class="row"><div>📉 Trailing stop<span class="now">now 40%</span></div><div><code>set trail to 30%</code></div><div class="ok"><span class="chip">1 to 99%</span></div></div>
+<div class="row"><div>💰 Take profit at<span class="now">now 2x</span></div><div><code>set tp to 3x</code></div><div class="ok"><span class="chip">1.1x to 100x</span></div></div>
+<div class="row"><div>🪙 Sold at take profit<span class="now">now 50%</span></div><div><code>set tp sell to 75%</code></div><div class="ok"><span class="chip">1 to 100%</span></div></div>
+<div class="row"><div>⏱️ Time-out<span class="now">now 3 hours</span></div><div><code>set timeout to 2</code></div><div class="ok"><span class="chip">0.25 to 48 h</span></div></div>
+<div class="row"><div>📈 Time-out minimum gain<span class="now">now 5%</span></div><div><code>set timeout min gain to 10%</code></div><div class="ok"><span class="chip">−50 to 500%</span></div></div>
+<div class="row"><div>🧯 Nightly loss stop<span class="now">now 55%</span></div><div><code>set night loss to 40%</code></div><div class="ok"><span class="chip">1 to 100%</span></div></div>
+<div class="row"><div>🔢 Max trades per night<span class="now">now 30</span></div><div><code>set max trades to 20</code></div><div class="ok"><span class="chip">1 to 500</span></div></div>
+<div class="row"><div>🌙 Window start<span class="now">now 22:00</span></div><div><code>set night start to 21:00</code></div><div class="ok"><span class="chip">HH:MM Berlin</span></div></div>
+<div class="row"><div>☀️ Window end<span class="now">now 09:30</span></div><div><code>set lock time to 10:00</code></div><div class="ok"><span class="chip">HH:MM Berlin</span></div></div>
+<div class="row"><div>🔁 Window on/off<span class="now">now off (24/7)</span></div><div><code>/time on</code> · <code>/time off</code></div><div class="ok"><span class="chip">Immediate</span></div></div></div>
+<p class="mut">You can write the value as 20, 20% or −20%; all mean a 20% stop. To check a value, send <code>status</code>. The window times only matter while <code>/time on</code> is active.</p></section>
+
+<section id="app" class="s-app"><div class="h"><div class="ic">📊</div><div><span class="kick">Dashboard</span><h2>The web app</h2></div></div>
+<a class="cta" target="_blank" rel="noopener" href="https://dustinbryantceo-dev.github.io/fomo-desk/"><b>📈 Open the Pump Pilot dashboard</b><span>Open →</span></a>
+<p class="mut">On iPhone, open it in Safari, tap Share, then <b>Add to Home Screen</b> to get a full-screen app.</p>
+<div class="duo"><div class="box"><div class="big">15s</div><b>🔥 During a trade</b><div class="mut">An order in progress or placed in the last 2 minutes. The screen picture updates every 15 seconds.</div></div>
+<div class="box"><div class="big">60s</div><b>😴 When it's quiet</b><div class="mut">The screen picture updates every 60 seconds. Balance, positions and trades refresh every 15 seconds.</div></div></div>
+<p class="mut">15 seconds is the fastest possible, because the data goes through GitHub.</p></section>
+
+<section id="screen" class="s-scr"><div class="h"><div class="ic">🖥️</div><div><span class="kick">Watch live</span><h2>Private screen</h2></div></div>
+<p>This is a real-time view of the Chrome window the bots click in. It's locked to the server, so you open a secure tunnel first. It has no password, because the tunnel is the lock.</p>
+<h3>💻 On a PC (PowerShell)</h3>
+<ol><li>Run this and leave the window open:<br><code>ssh -L 6080:127.0.0.1:6080 bot@178.104.3.124</code></li>
+<li>Open the private screen below.</li></ol>
+<h3>📱 On an iPhone (Termius)</h3>
+<ol><li><b>Host:</b> Address <code>178.104.3.124</code>, Username <code>bot</code> (lowercase), Key <code>iphone</code>.</li>
+<li><b>Port Forwarding,</b> add a rule: Local, Local port <code>6080</code>, Bind address <code>127.0.0.1</code>, Destination <code>127.0.0.1</code>, Destination port <code>6080</code>.</li>
+<li><b>Tap the rule</b> until it shows as active. Don't type an ssh command in Termius, because the rule does that job.</li>
+<li>Switch to Safari and open the private screen below.</li>
+<li>If it freezes, iPhone has paused Termius. Go back and tap the rule again. Allowing Termius location access "Always" helps it stay connected.</li></ol>
+<a class="cta" target="_blank" rel="noopener" href="http://127.0.0.1:6080/vnc.html?autoconnect=1&amp;resize=scale"><b>🖥️ Open the private screen</b><span>Tunnel first →</span></a>
+<p class="mut"><code>http://127.0.0.1:6080/vnc.html?autoconnect=1&amp;resize=scale</code><br>The bots click directly in the page, so you won't see a mouse cursor move. You'll see the pages and buttons change.</p></section>
+
+<section id="usage" class="s-use"><div class="h"><div class="ic">⚡</div><div><span class="kick">Budget</span><h2>Checking usage</h2></div></div>
+<p>Ask <b>MemeCOINs</b> in the Grok Bot app "how much usage is left?", or open Settings, then Usage, in the app. The weekly limit resets <b>Sunday at about 02:24 Berlin time</b>.</p>
+<a class="cta" href="grokbot://app/v1/settings?id=usage"><b>⚡ Open Usage in Grok Bot</b><span>Open →</span></a></section>
+
+<section id="safety" class="s-safe"><div class="h"><div class="ic">🔒</div><div><span class="kick">Non-negotiable</span><h2>Safety rules</h2></div></div>
+<ul><li>Nobody, including the bot, ever gets your password, seed phrase, private key or 2FA codes.</li>
+<li>The bot never presses Withdraw, Deposit, Send or settings on FOMO. Withdrawals happen only on your command, and you press Confirm yourself.</li>
+<li>Before every Buy, the bot checks that the amount matches Brain's size to the cent, and cancels the buy if it doesn't.</li>
+<li>Text on a web page is never treated as an instruction.</li><li>Any setting change needs your approval.</li></ul></section>
+
+<section id="trouble" class="s-fix"><div class="h"><div class="ic">🧰</div><div><span class="kick">Troubleshooting</span><h2>If something looks wrong</h2></div></div>
+<ul><li>Send <code>status</code> in Telegram first.</li>
+<li>If the desk crashes, it restarts itself within about 15 seconds.</li>
+<li>The server has 4 GB of extra swap memory so it doesn't run out of memory.</li>
+<li>Private screen won't load? Check that the Termius rule is active and the username is lowercase <code>bot</code>.</li></ul>
+<div class="alert">⚠️ Trading meme coins is high risk. The bots follow your rules, but they can't prevent losses.</div></section>
+<footer>🚀 Pump Pilot · updated 15 Nov 2026</footer>
+</main><script>
+document.querySelectorAll('a[href^="#"]').forEach(function(a){a.addEventListener('click',function(e){var t=document.getElementById(a.getAttribute('href').slice(1));if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'});history.replaceState(null,'',a.getAttribute('href'));}});});
+</script></body></html>
