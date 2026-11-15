@@ -1,4 +1,4 @@
-// app.js - the desk on the iPhone (STEP 10), hosting plan B (DECISIONS #26).
+// app.js - Pump Pilot, the desk on the iPhone (STEP 10, restyled 2026-11-15), hosting plan B (DECISIONS #26).
 // Reads encrypted files from the public repo with desk-crypto.js, polls every 15 s (no SSE).
 // FOMO links are only ever the strings links.py put into the data; this file never builds one.
 (() => {
@@ -39,6 +39,7 @@
       try { localStorage.setItem("desk.last", JSON.stringify({ t: ix.t, state: ix.state })); } catch {}
       if (Date.now() / 1000 - ix.t > STALE_S) S.err = "stale";
       await Promise.allSettled(["chart/" + S.range, "activity/0", "coins"].map(getFile));
+      try { fxDiff(ix.state, S.files["activity/0"]); } catch {}
       if (ix.files.screen && ix.files.screen !== S.screenVer) loadScreen(ix.files.screen);
     } catch (e) { S.err = e.status === 404 || /no index/.test(e.message) ? "nodata" : "offline"; }
     S.firstTry = false; S.retryAt = Date.now() + POLL_S * 1000;
@@ -118,42 +119,169 @@
       ${sk(24, "40%", 8, 26)}<div style="display:flex;gap:10px">${sk(170, "76%", 16)}${sk(170, "24%", 16)}</div>`;
   }
 
+  // ---------- Pump Pilot: home ----------
+  const LOGO = '<svg viewBox="0 0 32 32" class="pplogo" aria-hidden="true"><defs><linearGradient id="ppg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00f5a0"/><stop offset="1" stop-color="#00c2ff"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="#0b1411" stroke="url(#ppg)" stroke-width="1.5"/><path d="M7 21l6-6 4 4 8-9" fill="none" stroke="url(#ppg)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 10h5v5" fill="none" stroke="url(#ppg)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const modeBadge = () => { const m = S.state && S.state.mode; return m === "LIVE" ? '<span class="mbadge live"><i></i>LIVE</span>' : m === "PAPER" ? '<span class="mbadge paper">PAPER</span>' : ""; };
+  const LIGHT = { running: ["ok", "OK"], paused: ["paused", "Paused"], stale: ["stale", "Stale"], off: ["off", "Off"] };
+  function botStrip() {
+    return `<div class="botstrip">${BOT_ORDER.map((n) => { const b = bots()[n] || { name: n, title: n, status: "off" };
+      const [cls, lab] = LIGHT[b.status] || LIGHT.off;
+      const sub = b.status === "stale" && b.age_s != null ? Math.round(b.age_s / 60) + "m" : lab;
+      return `<button class="bchip ${cls}" data-act="tab" data-tab="bots" title="${esc(b.title || n)} · ${esc(b.status || "off")}"><i class="light"></i><span class="bn">${esc(b.title || n[0].toUpperCase() + n.slice(1))}</span><span class="bs">${esc(sub)}</span></button>`; }).join("")}</div>`;
+  }
+  const isTP = (r) => r.kind === "sold" && /take ?profit|\btp\b/i.test((r.subtitle || "") + " " + (r.reason || ""));
+  const tradeTag = (r) => r.kind === "bought" ? '<span class="tag buy">BUY</span>' : r.kind === "stopped" ? '<span class="tag stop">STOP</span>'
+    : isTP(r) ? '<span class="tag tp">TAKE PROFIT</span>' : /trail/i.test(r.subtitle || "") ? '<span class="tag sell">TRAIL</span>' : '<span class="tag sell">SELL</span>';
+  function tradeRow(r) {
+    const k = r.kind, cls = k === "bought" ? "buy" : k === "stopped" ? "stop" : isTP(r) ? "tp" : "sell";
+    const val = String(r.value || ""), neg = /^-/.test(val);
+    return `<div class="trow ${cls}" data-act="coin" data-mint="${esc(r.mint)}" data-aid="${esc(r.id)}">
+      <div class="tsym">${sym((r.title || "").split(" ").slice(1).join(" ") || null, r.mint)}</div>
+      <div class="tmid">${tradeTag(r)}<span class="tsub">${esc((r.subtitle || "").replace(/^Executor · \d\d:\d\d$/, "Executor"))}</span></div>
+      <div class="tval ${k === "bought" ? "" : neg ? "down" : "up"}">${esc(val.split(" · ")[0])}<small>${hm(r.ts)}</small></div></div>`;
+  }
+  function feedRow(r) {
+    const k = r.kind, cls = k === "bought" ? "buy" : k === "stopped" ? "stop" : k === "sold" ? (isTP(r) ? "tp" : "sell") : "skip";
+    return `<div class="frow ${cls}" data-act="${k === "rejected" ? "audit" : "coin"}" data-mint="${esc(r.mint)}"><i></i><span class="ft trunc"><b>${esc(r.title)}</b> <span class="mut">${esc(r.subtitle || "")}</span></span><span class="fv">${esc(k === "rejected" ? "skip" : String(r.value || "").split(" · ")[0])}</span><span class="fts">${hm(r.ts)}</span></div>`;
+  }
+  function posCard(p) {
+    const pnl = p.value_usd != null && p.size_usd != null ? p.value_usd - p.size_usd : null, upp = (p.change_pct || 0) >= 0;
+    const tags = (p.tp_done ? '<span class="tag tp">TP HIT</span>' : "") + (p.trail_active ? '<span class="tag sell">TRAILING</span>' : "");
+    return `<div class="prow ${upp ? "gain" : "loss"}" data-act="coin" data-mint="${esc(p.mint)}">
+      <div class="pic">${sym(p.symbol, p.mint).slice(0, 1)}</div>
+      <div class="ptx"><div class="psym">${sym(p.symbol, p.mint)} ${tags}</div><div class="psub">${money(p.size_usd)} in · stop ${priceFmt(p.stop_price)}${p.opened_at ? " · " + hm(p.opened_at) : ""}</div></div>
+      <div class="ppl"><div class="pval">${money(p.value_usd)}</div><div class="${upp ? "up" : "down"} pchg">${pnl == null ? "–" : signedMoney(pnl)} · ${pct(p.change_pct, 1)}</div></div></div>`;
+  }
+  function frameNote(scr) {
+    return scr.trade_live ? '<span class="fn live"><i></i>Updating every 15s · trade live</span>' : `<span class="fn">Updating every ${scr.published_every_s || 60}s</span>`;
+  }
+
   function viewHome() {
     const st = S.state, a = (S.files["activity/0"] || { rows: [] }).rows, chart = S.files["chart/" + S.range];
     const up = (st.today_pct || 0) >= 0, unseen = a.length && a[0].ts > +(localStorage.getItem("desk.seen") || 0);
-    const lastO = st.last_order;
-    const scr = st.screen || {};
+    const lastO = st.last_order, scr = st.screen || {};
+    const trades = a.filter((r) => r.kind === "bought" || r.kind === "sold" || r.kind === "stopped");
+    const delta = st.balance != null && st.night_start_balance != null ? st.balance - st.night_start_balance : null;
+    const pos = st.positions || [], posPnl = pos.reduce((s, p) => s + (p.value_usd != null && p.size_usd != null ? p.value_usd - p.size_usd : 0), 0);
+    const running = (st.bots || []).filter((b) => b.status === "running").length;
     return `
-      <div class="navbar">
-        <button class="avatar" data-act="tab" data-tab="account" aria-label="Account">D</button>
-        <button class="navtitle" data-act="tab" data-tab="bots">Grok Bot <span class="chev">›</span></button>
-        <div class="navsp"></div>
+      <header class="pphead">
+        <div class="brand">${LOGO}<div><div class="bname">Pump <span>Pilot</span></div><div class="btag">FOMO desk · ${running}/5 bots online</div></div></div>
+        <div class="navsp"></div>${modeBadge()}
         <button class="iconbtn" data-act="search" aria-label="Search">${ICON.search}</button>
         <button class="iconbtn" data-act="tab" data-tab="activity" aria-label="Activity">${ICON.bell}${unseen ? '<i class="dot"></i>' : ""}</button>
-      </div>
+      </header>
       <div id="searchbox"></div>
-      <div class="balrow"><div class="balance"><span class="odo" id="bal"></span></div>${paperPill()}</div>
-      <div class="today"><span class="${up ? "up" : "down"}">${pct(st.today_pct)}</span><span class="mut">today</span>
-        ${st.multiplier != null ? `<span class="pill mult">${st.multiplier.toFixed(2)}×</span>` : ""}</div>
-      <div class="chartbox"><canvas id="bchart"></canvas>${!chart || (chart.points || []).length < 2 ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}</div>
-      <div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>
-      <div class="live">
-        <div class="frame" id="liveframe" data-act="full">
-          <img alt=""><img alt="">
-          ${S.screenUrl ? "" : '<div class="nof">No frame yet</div>'}
-          ${scr.paused ? '<div class="paused"><div>Paused · private<br><span class="ter" style="font-size:13px">a login or withdraw form is open, no frames</span></div></div>' : ""}
-          <div class="tl" id="livetl"></div>
-          <div class="tr" id="livetr"></div>
-        </div>
-        <div class="last">${lastO ? lastOrderLine(lastO) : '<span class="mut">No orders yet</span>'}</div>
-        <div class="livenote">Plan B: a new frame every ${scr.published_every_s || 60}s</div>
-      </div>
-      <h2 class="sec">Bots <span class="count">· ${st.bots.filter((b) => b.status === "running").length} running</span><button class="more" data-act="tab" data-tab="bots">See all</button></h2>
-      <div class="carousel">${BOT_ORDER.map((n) => botCard(bots()[n] || { name: n, title: n })).join("")}</div>
-      <h2 class="sec">Activity<button class="more" data-act="tab" data-tab="activity">See all</button></h2>
-      ${a.length ? `<div class="list">${a.slice(0, 5).map(actRow).join("")}</div>` : st.positions.length ? `<div class="empty">Nothing yet tonight</div>` : `<div class="empty"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>`}
-      ${st.positions.length ? `<h2 class="sec">Open positions</h2><div class="list">${st.positions.map(posRow).join("")}</div>` : ""}`;
+      <div class="home">
+        <section class="hero glass" id="hero">
+          <div class="hlab">Total balance <span class="ter">· ${esc(st.balance_source || "")}</span></div>
+          <div class="balance"><span id="bal" class="tw"></span></div>
+          <div class="hrow">
+            ${st.today_pct != null ? `<span class="chg ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${delta != null ? signedMoney(delta) + " · " : ""}${pct(st.today_pct)}</span><span class="mut">vs night start</span>` : '<span class="mut">No night start yet</span>'}
+            ${st.multiplier != null ? `<span class="pill mult">${st.multiplier.toFixed(2)}×</span>` : ""}
+          </div>
+          <div class="hstats">
+            <div><span>Cash</span><b>${money(st.cash)}</b></div>
+            <div><span>Positions</span><b>${pos.length ? money(pos.reduce((s, p) => s + (p.value_usd || 0), 0)) : "$0.00"}</b></div>
+            <div><span>Open P&amp;L</span><b class="${posPnl >= 0 ? "up" : "down"}">${pos.length ? signedMoney(posPnl) : "–"}</b></div>
+          </div>
+          <div class="chartbox"><canvas id="bchart"></canvas>${!chart || (chart.points || []).length < 2 ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}</div>
+          <div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>
+        </section>
+        <section class="a-bots">${botStrip()}</section>
+        <section class="a-pos">
+          <h2 class="sec">Open positions <span class="count">· ${pos.length}</span></h2>
+          ${pos.length ? `<div class="plist">${pos.map(posCard).join("")}</div>` : '<div class="empty glass"><b>No open positions</b>Risk is watching for the next entry.</div>'}
+        </section>
+        <section class="a-frame">
+          <h2 class="sec">FOMO screen ${frameNote(scr)}</h2>
+          <div class="live glass">
+            <div class="frame" id="liveframe" data-act="full">
+              <img alt=""><img alt="">
+              ${S.screenUrl ? "" : '<div class="nof">No frame yet</div>'}
+              ${scr.paused ? '<div class="paused"><div>Paused · private<br><span class="ter" style="font-size:13px">a login or withdraw form is open, no frames</span></div></div>' : ""}
+              <div class="tl" id="livetl"></div>
+              <div class="tr" id="livetr"></div>
+            </div>
+            <div class="last">${lastO ? lastOrderLine(lastO) : '<span class="mut">No orders yet</span>'}</div>
+          </div>
+        </section>
+        <section class="a-trades">
+          <h2 class="sec">Recent trades<button class="more" data-act="tab" data-tab="activity">See all</button></h2>
+          ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
+        </section>
+        <section class="a-feed">
+          <h2 class="sec">Live feed <span class="count">· buys, sells, skips</span></h2>
+          ${a.length ? `<div class="feed glass">${a.slice(0, 12).map(feedRow).join("")}</div>` : '<div class="empty glass">Nothing yet tonight</div>'}
+        </section>
+      </div>`;
   }
+
+  // ---------- Pump Pilot: balance tween (ease-out 900 ms; reduced motion = set) ----------
+  function tween(el, to) {
+    if (to == null || isNaN(to)) { el.textContent = "–"; el.dataset.n = ""; return; }
+    const from = el.dataset.n === undefined || el.dataset.n === "" ? null : +el.dataset.n;
+    el.dataset.n = String(to);
+    if (from == null || reduce() || Math.abs(from - to) < 0.005) { el.textContent = money(to); return; }
+    el.classList.remove("tick-up", "tick-down"); void el.offsetWidth; el.classList.add(to > from ? "tick-up" : "tick-down");
+    const t0 = performance.now(), D = 900; cancelAnimationFrame(el._raf);
+    const step = (t) => { const k = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = money(from + (to - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
+    el._raf = requestAnimationFrame(step);
+  }
+
+  // ---------- Pump Pilot: trade effects, from diffing activity rows + positions between polls ----------
+  // buy -> green flash; take-profit sell (or tp_done 0->1) -> gold flash + confetti; stop sell -> red flash + shake
+  const FX = { seen: null, pos: null, queue: [] };
+  function fxDiff(state, act) {
+    const rows = (act && act.rows) || [], pos = Object.fromEntries(((state && state.positions) || []).map((p) => [p.mint, p]));
+    if (!act) return;                                    // activity not loaded yet: diff on the next poll
+    if (FX.seen === null) { FX.seen = new Set(rows.map((r) => r.id)); FX.pos = pos; return; }   // first load: remember, no effects
+    const out = [], hit = new Set();
+    for (const r of rows.slice().reverse()) {
+      if (FX.seen.has(r.id)) continue; FX.seen.add(r.id);
+      const kind = r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : "sell") : null;
+      if (kind) { out.push({ kind, mint: r.mint, aid: r.id }); hit.add(kind + r.mint); }
+    }
+    for (const [m, p] of Object.entries(pos)) {
+      const o = FX.pos[m];
+      if (!o && !hit.has("buy" + m)) out.push({ kind: "buy", mint: m });
+      else if (o && !o.tp_done && p.tp_done && !hit.has("tp" + m)) out.push({ kind: "tp", mint: m });
+    }
+    FX.pos = pos; FX.queue.push(...out);
+  }
+  function fxPlay() {
+    if (!FX.queue.length) return;
+    if (S.tab !== "home" || S.stack.length) { FX.queue.length = 0; return; }   // only play on Home, never replay old ones later
+    const q = FX.queue.splice(0).slice(-3); const calm = reduce();
+    q.forEach((e, i) => setTimeout(() => {
+      const targets = [...document.querySelectorAll(`.prow[data-mint="${CSS.escape(e.mint || "")}"]`), ...document.querySelectorAll(`.trow[data-aid="${CSS.escape(String(e.aid ?? "-"))}"]`)];
+      const hero = $("#hero"); const all = targets.length ? targets : hero ? [hero] : [];
+      if (e.kind !== "buy" && hero && !all.includes(hero)) all.push(hero);
+      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + e.kind); setTimeout(() => el.classList.remove("fx-" + e.kind), 2400); });
+      banner(e);
+      const vis = all.find((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
+      if (e.kind === "tp" && !calm) confetti(vis || hero);
+    }, i * 700));
+  }
+  function banner(e) {
+    const t = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Sold" }[e.kind];
+    const p = (S.state.positions || []).find((x) => x.mint === e.mint);
+    const r = ((S.files["activity/0"] || {}).rows || []).find((x) => x.id === e.aid || (e.aid == null && x.mint === e.mint));
+    const s = (p && p.symbol) || (r && (r.title || "").split(" ").slice(1).join(" ")) || (e.mint || "").slice(0, 4);
+    const el = document.createElement("div"); el.className = "ppban " + e.kind;
+    el.innerHTML = `<b>${esc(t)}</b> ${esc(s)}${r && r.value ? ` <span>${esc(String(r.value).split(" · ")[0])}</span>` : ""}`;
+    document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 2600); setTimeout(() => el.remove(), 3200);
+  }
+  function confetti(anchor) {
+    if (!anchor) return; const r = anchor.getBoundingClientRect(), box = document.createElement("div"); box.className = "confetti";
+    box.style.left = r.left + r.width / 2 + "px"; box.style.top = r.top + r.height / 2 + "px";
+    const cols = ["#ffd447", "#ffb800", "#00f5a0", "#00c2ff", "#fff3b0"];
+    for (let i = 0; i < 28; i++) { const s = document.createElement("i"); const a = Math.random() * Math.PI * 2, d = 60 + Math.random() * 110;
+      s.style.cssText = `--x:${Math.cos(a) * d}px;--y:${Math.sin(a) * d - 40}px;--r:${Math.random() * 720 - 360}deg;background:${cols[i % cols.length]};animation-delay:${Math.random() * 80}ms`; box.appendChild(s); }
+    document.body.appendChild(box); setTimeout(() => box.remove(), 1600);
+  }
+
   function lastOrderLine(o) {
     const verb = o.side === "buy" ? "Bought" : "Sold";
     const ok = o.status === "done", v = ok ? "verified" : esc(o.status);
@@ -195,7 +323,7 @@
     return `<div class="card bot" ${full ? "" : `data-act="tab" data-tab="bots"`}><div class="head">${st}<span style="color:${esc(b.color || "#fff")}">${esc(b.title || b.name)}</span><span class="ter" style="margin-left:auto;font-weight:400;font-size:13px">${esc(b.status || "off")}</span></div>${body}</div>`;
   }
   function actRow(r) {
-    const k = r.kind, col = k === "bought" ? "#0a84ff" : k === "sold" ? "#00d35a" : k === "stopped" ? "#ff453a" : "#8e8e93";
+    const k = r.kind, col = k === "bought" ? "#00f5a0" : k === "sold" ? (isTP(r) ? "#ffc940" : "#00c2ff") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
     const rv = k === "rejected" ? `<span class="mut">Skipped</span>` : esc(r.value || "");
     const act = k === "rejected" ? "audit" : "coin";
     return `<div class="row" data-act="${act}" data-mint="${esc(r.mint)}"><div class="ic" style="color:${col}">${esc((r.title || "?").split(" ").pop().slice(0, 1))}</div>
@@ -335,7 +463,7 @@
     else if (S.tab === "account") { ensure("account"); ensure("settings"); html = viewAccount(); }
     const oldBal = $("#bal");     // keep the odometer node across renders so changed digits roll
     view.innerHTML = html;
-    const newBal = $("#bal"); if (oldBal && newBal && oldBal.dataset.v) newBal.replaceWith(oldBal);
+    const newBal = $("#bal"); if (oldBal && newBal && oldBal.dataset.n) newBal.replaceWith(oldBal);
     if (key === lastHtmlKey && fromPoll) scrollTo(0, y); lastHtmlKey = key;
     after();
   }
@@ -350,13 +478,13 @@
   let prevChart = null;
   function after() {
     const bal = $("#bal");
-    if (bal && S.state) odo(bal, money(S.state.balance));
+    if (bal && S.state) tween(bal, S.state.balance);
     const bc = $("#bchart"); if (bc) { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; }
     const top = S.stack[S.stack.length - 1];
     const cc = $("#cchart"); if (cc && top) { const c = S.files["coin/" + top.mint]; if (c) Charts.candles(cc, c.candles, c.exit_line, c.position && c.position.entry_price); }
     document.querySelectorAll(".disc .d").forEach((d) => requestAnimationFrame(() => d.classList.add(d.dataset.st)));
     if (reduce()) document.querySelectorAll(".disc .d").forEach((d) => { d.style.transitionDelay = "0s"; d.classList.add(d.dataset.st); });
-    paintScreen(); liveLabel();
+    paintScreen(); liveLabel(); fxPlay();
   }
 
   // ---------- actions ----------
@@ -445,7 +573,9 @@
     S.dp = S.dp || "fixture"; S.ix = { files: {}, t: fx.t || Date.now() / 1000 }; S.state = fx.state; S.lastIxT = S.ix.t; S.err = fx.err || null; S.retryAt = Date.now() + POLL_S * 1000; S.firstTry = false;
     for (const [k, v] of Object.entries(fx.files || {})) { S.files[k] = v; S.ver[k] = "fx"; S.ix.files[k] = "fx"; }
     if (fx.screen) { S.screenUrl = fx.screen; }
+    fxDiff(S.state, S.files["activity/0"]);
     render();
+    window.__ppFixtureStep = (nx) => { S.state = nx.state; for (const [k, v] of Object.entries(nx.files || {})) S.files[k] = v; fxDiff(S.state, S.files["activity/0"]); render(true); };
   }
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
   addEventListener("resize", () => after());
