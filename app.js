@@ -120,7 +120,7 @@
   }
 
   // ---------- Pump Pilot: home ----------
-  const LOGO = '<svg viewBox="0 0 32 32" class="pplogo" aria-hidden="true"><defs><linearGradient id="ppg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00f5a0"/><stop offset="1" stop-color="#00c2ff"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="#0b1411" stroke="url(#ppg)" stroke-width="1.5"/><path d="M7 21l6-6 4 4 8-9" fill="none" stroke="url(#ppg)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 10h5v5" fill="none" stroke="url(#ppg)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const LOGO = '<svg viewBox="0 0 32 32" class="pplogo" aria-hidden="true"><defs><linearGradient id="ppg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00f5a0"/><stop offset="1" stop-color="#00c2ff"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="#0b1411" stroke="url(#ppg)" stroke-width="1.5"/><g transform="rotate(45 16 16)"><path d="M13.6 21.6h4.8L16 26.6z" fill="#00c2ff" opacity=".9"/><path d="M12.2 17.2L8.8 21v1.6l3.4-1.2zM19.8 17.2l3.4 3.8v1.6l-3.4-1.2z" fill="url(#ppg)"/><path d="M16 5.4c3 2.4 4.1 6 4.1 9.8v6.4h-8.2v-6.4c0-3.8 1.1-7.4 4.1-9.8z" fill="url(#ppg)"/><circle cx="16" cy="13.4" r="1.9" fill="#0b1411" stroke="#d9fff3" stroke-width=".6"/></g></svg>';
   const modeBadge = () => { const m = S.state && S.state.mode; return m === "LIVE" ? '<span class="mbadge live"><i></i>LIVE</span>' : m === "PAPER" ? '<span class="mbadge paper">PAPER</span>' : ""; };
   const LIGHT = { running: ["ok", "OK"], paused: ["paused", "Paused"], stale: ["stale", "Stale"], off: ["off", "Off"] };
   function botStrip() {
