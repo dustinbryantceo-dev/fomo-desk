@@ -424,7 +424,7 @@ h2.sec .count{font-weight:450}
 .tabbar button.on{color:var(--teal-2)}
 /* tab and screen transitions (none with reduced motion) */
 #view.vin{animation:vin .26s var(--ease)}
-@keyframes vin{from{opacity:0;transform:translate3d(0,8px,0)}}
+@keyframes vin{from{opacity:0}}   /* opacity only: a transform on #view would make it the sticky header's containing layer (iOS overlap bug) */
 @media (prefers-reduced-motion: reduce){#view.vin{animation:none}}
 
 /* guide card (Home) */
@@ -468,3 +468,30 @@ h2.sec .count{font-weight:450}
 .list.ctl .t2.pend{color:var(--orange);margin-top:4px}
 .modemsg[data-k="busy"]{color:var(--sec)}.modemsg[data-k="ok"]{color:var(--teal)}.modemsg[data-k="err"]{color:var(--red)}
 .list.ctl .t1,.list.ctl .t2{white-space:normal;overflow:visible;text-overflow:clip}
+
+/* sticky header (2026-11-15, Dustin's iPhone): solid, full-bleed, safe-area aware, above the scrolling cards */
+.pphead{position:sticky;top:0;z-index:25;isolation:isolate;background:#07090f;
+  margin:calc(-8px - var(--st)) calc(-16px - var(--sr)) 10px calc(-16px - var(--sl));
+  padding:calc(var(--st) + 6px) calc(16px + var(--sr)) 8px calc(16px + var(--sl));
+  border-bottom:1px solid rgba(110,200,190,.10);box-shadow:0 8px 18px -12px rgba(0,0,0,.9)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .pphead{background:rgba(7,9,15,.94);backdrop-filter:saturate(140%) blur(16px);-webkit-backdrop-filter:saturate(140%) blur(16px)}}
+@media (min-width:900px){.pphead{margin-left:-28px;margin-right:-28px;padding-left:28px;padding-right:28px}}
+.offline:not([hidden]) + #view .pphead{margin-top:-8px;padding-top:6px;top:0}
+.iconbtn .dot.amber{background:var(--orange)}
+.iconbtn.paused{color:var(--orange)}
+/* phase 2 controls */
+.p2t{font:700 20px var(--disp);margin-bottom:6px}
+.p2msg{margin-top:10px;white-space:normal}
+.p2msg[data-k="busy"]{color:var(--sec)}.p2msg[data-k="ok"]{color:var(--teal)}.p2msg[data-k="err"]{color:var(--red)}
+.p2note{background:rgba(25,230,193,.08);border:1px solid rgba(25,230,193,.25);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45;margin:6px 0 10px;color:var(--sec)}
+.p2note b{color:var(--text)}.p2note.live{background:rgba(255,77,109,.08);border-color:rgba(255,77,109,.35)}.p2note.warn{background:rgba(255,166,43,.08);border-color:rgba(255,166,43,.35)}
+.btn.sm{min-height:36px;flex:none;padding:0 14px;font-size:14px;border-radius:10px}
+.p2list .row{align-items:center}
+.sv{color:var(--sec);font-variant-numeric:tabular-nums;margin-left:8px;white-space:nowrap}
+.linkbtn{color:var(--teal);font:inherit;padding:0}
+button.sw{border:0;padding:0;flex:none;cursor:pointer}button.sw.live{opacity:1}
+.p2why{margin-top:10px;font-size:14px;line-height:1.5;color:var(--sec);padding:12px 14px}
+.p2in{margin-top:12px}
+html.tg a{color:var(--tg-link,var(--teal))}
+html.tg .tabbar{padding-bottom:calc(6px + var(--sb))}

@@ -88,6 +88,8 @@
     search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
     bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
     back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
+    pause: '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>',
+    play: '<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>',
     shield: '<svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/></svg>',
   };
   const backBar = (label) => `<div class="navbar"><button class="back" data-act="back">${ICON.back}${esc(label)}</button></div>`;
@@ -174,6 +176,7 @@
       <header class="pphead">
         <div class="brand">${LOGO}<div><div class="bname">Pump <span>Pilot</span></div><div class="btag">FOMO desk · ${running}/5 bots online</div></div></div>
         <div class="navsp"></div><span id="mbadge">${modeBadge()}</span>
+        ${canCtl() ? `<button class="iconbtn ${pausedNow().size ? "paused" : ""}" data-act="bots" aria-label="Pause or resume bots">${pausedNow().size ? ICON.play : ICON.pause}${pausedNow().size ? '<i class="dot amber"></i>' : ""}</button>` : ""}
         <button class="iconbtn" data-act="search" aria-label="Search">${ICON.search}</button>
         <button class="iconbtn" data-act="tab" data-tab="activity" aria-label="Activity">${ICON.bell}${unseen ? '<i class="dot"></i>' : ""}</button>
       </header>
@@ -494,9 +497,11 @@
       <div class="chartbox" style="height:220px;margin-top:10px"><canvas id="cchart"></canvas>${(c.candles || []).length ? "" : '<div class="chartnote">No price data yet</div>'}</div>
       <div class="stats"><div><span>Market cap</span><b>${compact(c.market_cap_usd)}</b></div><div><span>Liquidity</span><b>${compact(c.liquidity_usd)}</b></div><div><span>Holders</span><b>${c.holders != null ? c.holders.toLocaleString() : "–"}</b></div></div>
       ${p ? `<div class="card poscard"><div class="tx" style="flex:1"><div class="t1">Your position · ${money(p.size_usd)} in · Executor</div><div class="t2 mut" style="font-size:13px;margin-top:3px">now ${money(p.value_usd)} · stop ${priceFmt(c.exit_line)}</div></div></div>` : `<div class="card poscard"><span class="mut">No open position</span></div>`}
-      <div class="btns">${fomoLink(c.link) ? `<a class="btn primary" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : ""}
-        <button class="btn ${p ? "" : "dis"}" data-act="sell" data-mint="${esc(mint)}" ${p ? "" : "disabled"}>Sell now</button></div>
-      <button class="loadmore" data-act="audit" data-mint="${esc(mint)}">Audit</button>`;
+      <div class="btns">${fomoLink(c.link) ? `<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : ""}
+        ${p ? `<button class="btn red" data-act="sell" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Sell…</button>`
+            : canCtl() && String(c.chain || "solana").toLowerCase() === "solana" ? `<button class="btn primary" data-act="buy" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Buy…</button>` : ""}</div>
+      <div class="btns" style="margin-top:8px"><button class="btn" data-act="audit" data-mint="${esc(mint)}">Audit</button>${canCtl() ? `<button class="btn" data-act="why" data-mint="${esc(mint)}">Why? (Analyst)</button>` : ""}</div>
+      <div id="whybox"></div>`;
   }
 
   function viewAudit(mint) {
@@ -538,6 +543,13 @@
         ${fomoLink(ac.profile_url) ? `<a class="row" href="${esc(ac.profile_url)}" target="_blank" rel="noopener noreferrer"><div class="tx"><div class="t1">Your FOMO profile</div><div class="t2">@${esc(ac.fomo_handle)}</div></div><span class="ter">›</span></a>` : ""}
         ${fomoLink(ac.invite_url) ? `<button class="row" data-act="invite" style="width:100%;text-align:left"><div class="tx"><div class="t1">Invite a friend</div><div class="t2">Share your FOMO invite link</div></div><span class="ter">›</span></button>` : ""}
       </div>
+      ${canCtl() ? `<div class="grp">Control</div><div class="list plain">
+        <button class="row" data-act="settingsv" style="width:100%;text-align:left"><div class="tx"><div class="t1">Settings</div><div class="t2">Stop, take profit, trail, sizes… same as /set, with confirm</div></div><span class="ter">›</span></button>
+        <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window</div><div class="t2">${S.ctl.s && S.ctl.s.window_enabled === false ? "OFF · buys 24/7" : "ON · night only"} · /time</div></div><span class="ter">›</span></button>
+        <button class="row" data-act="bots" style="width:100%;text-align:left"><div class="tx"><div class="t1">Pause / resume bots</div><div class="t2">${pausedNow().size ? "Paused: " + esc([...pausedNow()].join(", ")) : "All running"}</div></div><span class="ter">›</span></button>
+        <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite · copy traders on/off · withdraw</div></div><span class="ter">›</span></button>
+        <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
+      </div>` : ""}
       <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
       <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
@@ -547,9 +559,9 @@
         <div class="row"><div class="tx"><div class="t1 mut">Send test push</div><div class="t2">via Telegram (STEP 11)</div></div></div>
         <div class="row"><div class="tx"><div class="t1">Watch in Grok Bot</div><div class="t2">Open the Grok Bot app to watch the bot's computer live</div></div></div>
       </div>
-      <div class="grp" style="margin-top:28px">Settings · read-only here, change via Telegram (STEP 11), e.g. "set stop to -20%"</div>
-      ${["scanner", "analyst", "social", "brain", "executor", "risk", "desk", "browser"].filter((g) => groups[g]).map((g) => `<div class="grp" id="set-${g}">${esc(g[0].toUpperCase() + g.slice(1))}</div><div class="list plain">${groups[g].map(setRow).join("")}</div>`).join("")}
-      <div class="ter" style="font-size:12px;text-align:center;margin:20px 0">Last update ${hm(S.lastIxT)} · ${esc(st ? st.mode : "")} · hosting plan B</div>`;
+      ${canCtl() ? "" : `<div class="grp" style="margin-top:28px">Settings · read-only without the control token; Telegram: "set stop to -20%"</div>
+      ${["scanner", "analyst", "social", "brain", "executor", "risk", "desk", "browser"].filter((g) => groups[g]).map((g) => `<div class="grp" id="set-${g}">${esc(g[0].toUpperCase() + g.slice(1))}</div><div class="list plain">${groups[g].map(setRow).join("")}</div>`).join("")}`}
+      <div class="ter" style="font-size:12px;text-align:center;margin:20px 0">Last update ${hm(S.lastIxT)} · ${esc(st ? st.mode : "")}${S.tg ? " · in Telegram" : ""}</div>`;
   }
 
   function copyPicks(cp) {
@@ -563,11 +575,12 @@
         <div class="cp-n"><span class="up">7d ${esc(k(r.pnl_7d))}</span><span class="up">30d ${esc(k(r.pnl_30d))}</span><span class="mut">${esc(r.trades)} trades</span><span class="mut">last trade ${esc(ago(r.last_trade_ts))}</span></div>
         ${r.last_buy_mint ? (fomoLink(r.coin_link) ? `<a class="cp-buy" href="${esc(r.coin_link)}" target="_blank" rel="noopener noreferrer">` : `<div class="cp-buy">`) + `<span>Last buy · ${esc(r.last_buy_symbol || r.last_buy_mint.slice(0, 6))}</span><span class="mut">${r.last_buy_mcap ? money(r.last_buy_mcap, 0) : "mcap n/a"}${r.last_buy_chain !== "solana" ? " · " + esc(r.last_buy_chain) : ""} ›</span>` + (fomoLink(r.coin_link) ? "</a>" : "</div>") : ""}
         <div class="cp-why mut">${esc(r.why)}</div>
-        <div class="cp-sw"><span>Copy on desk</span><span class="sw ${r.copy_on ? "on" : ""}" aria-disabled="true"><i></i></span></div>
+        ${canCtl() && r.last_buy_mint && r.last_buy_chain === "solana" ? `<button class="btn sm" style="margin-top:8px" data-act="buy" data-mint="${esc(r.last_buy_mint)}" data-sym="${esc(r.last_buy_symbol || "")}">Buy ${esc(r.last_buy_symbol || "it")}…</button>` : ""}
+        <div class="cp-sw"><span>Copy on desk</span>${canCtl() ? `<button class="sw ${(copyIsOn(r.handle) ?? r.copy_on) ? "on" : ""} live" data-act="copysw" data-h="${esc(r.handle)}" aria-pressed="${!!(copyIsOn(r.handle) ?? r.copy_on)}" aria-label="Copy ${esc(r.handle)}"><i></i></button>` : `<span class="sw ${r.copy_on ? "on" : ""}" aria-disabled="true"><i></i></span>`}</div>
       </div>`;
     const hist = cp.lists.map((l) => `<div class="row"><div class="tx"><div class="t1">${esc(l.list_id)}</div><div class="t2">${l.rows.map((r) => esc(r.handle)).join(" · ")}</div></div></div>`).join("");
     return head + `<div class="ter" style="font-size:12px;margin:0 0 8px">${esc(cur.list_id)} · newest on top</div>${cur.rows.map(card).join("")}
-      ${roNote(`Copy on desk: 'copy on <handle>' (max ${esc(cp.max_on_copy)}, PAPER now)`)}
+      ${canCtl() ? `<div class="ro">Switch = /copy in Telegram: you confirm first, Telegram confirms after. <button class="linkbtn" data-act="social">What a switch does ›</button></div>` : roNote(`Copy on desk: 'copy on <handle>' (max ${esc(cp.max_on_copy)})`)}
       <div class="grp">Last 7 lists</div><div class="list plain">${hist}</div>`;
   }
 
@@ -578,12 +591,14 @@
     const view = $("#view"), top = S.stack[S.stack.length - 1];
     if (!S.dp) { view.innerHTML = viewGate("nolink"); return; }
     if (!S.state) { view.innerHTML = S.firstTry ? viewLoading() : viewGate("nodata"); return; }
-    const key = top ? top.kind + top.mint : S.tab;
+    const key = top ? top.kind + (top.mint || "") : S.tab;
     if (fromPoll && document.activeElement && document.activeElement.tagName === "INPUT") return; // don't wipe the search field
     const y = scrollY;
     let html = "";
     if (top && top.kind === "coin") { ensure("coin/" + top.mint); html = viewCoin(top.mint); }
     else if (top && top.kind === "audit") { ensure("audit/" + top.mint); html = viewAudit(top.mint); }
+    else if (top && top.kind === "settings") html = viewSettings();
+    else if (top && top.kind === "social") { ensure("account"); html = viewSocial(); }
     else if (S.tab === "home") html = viewHome();
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); html = viewBots(); }
     else if (S.tab === "activity") html = viewActivity();
@@ -611,7 +626,7 @@
     const cc = $("#cchart"); if (cc && top) { const c = S.files["coin/" + top.mint]; if (c) Charts.candles(cc, c.candles, c.exit_line, c.position && c.position.entry_price); }
     document.querySelectorAll(".disc .d").forEach((d) => requestAnimationFrame(() => d.classList.add(d.dataset.st)));
     if (reduce()) document.querySelectorAll(".disc .d").forEach((d) => { d.style.transitionDelay = "0s"; d.classList.add(d.dataset.st); });
-    paintScreen(); liveLabel(); fxPlay();
+    paintScreen(); liveLabel(); fxPlay(); tgBack();
   }
 
   // ---------- actions ----------
@@ -627,9 +642,19 @@
     else if (act === "more") { for (let i = 0; i < 10; i++) if (!S.files["activity/" + i]) { await getFile("activity/" + i).catch(() => {}); break; } render(); }
     else if (act === "search") openSearch();
     else if (act === "full") openFull();
-    else if (act === "sell") openSell(t.dataset.mint);
+    else if (act === "sell") { if (canCtl()) openTrade("sell", t.dataset.mint, t.dataset.sym); else openSell(t.dataset.mint); }
+    else if (act === "buy") openTrade("buy", t.dataset.mint, t.dataset.sym);
+    else if (act === "why") loadWhy(t.dataset.mint);
+    else if (act === "bots") openBots();
+    else if (act === "window") openWindow();
+    else if (act === "report") openReport();
+    else if (act === "settingsv") { push({ kind: "settings" }); loadSettings(true); }
+    else if (act === "setkey") openSet(t.dataset.k);
+    else if (act === "social") { push({ kind: "social" }); loadSocial(true); }
+    else if (act === "copysw") copySwitch(t.dataset.h);
+    else if (act === "p2invite") { const l = S.social && S.social.invite && S.social.invite[0]; if (l) { if (navigator.share) { try { await navigator.share({ title: "FOMO", url: l.url }); } catch {} } else { try { await navigator.clipboard.writeText(l.url); toast("Link copied"); } catch { toast(l.url); } } } }
     else if (act === "invite") invite();
-    else if (act === "closesheet") $("#sheet").hidden = true;
+    else if (act === "closesheet") closeSheet();
     else if (act === "fxdemo") fxDemo();
     else if (act === "mode") openMode(t.dataset.m);
     else if (act === "replay") rpStart();
@@ -661,18 +686,20 @@
   // Authorization header to API, and is never shown, logged or put in a URL.
   const API = "https://178-104-3-124.sslip.io";
   S.ctl = { st: "idle", s: null, at: 0 };
-  async function ctlFetch(path, body) {
-    const tok = DeskCrypto.appToken(); if (!tok) { const e = new Error("notoken"); e.code = "notoken"; throw e; }
-    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 10000);
+  // auth: the &t= token on this device, else (inside Telegram) the Mini App's signed initData, checked by the desk
+  function ctlAuth() { const t = DeskCrypto.appToken(); if (t) return "Bearer " + t; const d = S.tg && S.tg.initData; return d ? "tma " + d : null; }
+  async function ctlFetch(path, body, ms) {
+    const auth = ctlAuth(); if (!auth) { const e = new Error("notoken"); e.code = "notoken"; throw e; }
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 12000);
     try {
       const r = await fetch(API + path, { method: body ? "POST" : "GET", mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal,
-        headers: Object.assign({ Authorization: "Bearer " + tok }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined });
+        headers: Object.assign({ Authorization: auth }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined });
       let j = {}; try { j = await r.json(); } catch {}
       return { status: r.status, j };
     } finally { clearTimeout(tm); }
   }
   async function ctlPoll() {
-    if (!DeskCrypto.appToken()) { S.ctl.st = "notoken"; return; }
+    if (!ctlAuth()) { S.ctl.st = "notoken"; return; }
     try {
       const { status, j } = await ctlFetch("/api/status");
       S.ctl.st = status === 200 ? (j.desk_up ? "ok" : "deskdown") : status === 401 ? "badtoken" : status === 429 ? "locked" : "down";
@@ -699,11 +726,220 @@
     const { status, j } = await ctlFetch("/api/mode", to === "LIVE" ? { mode: to, confirm } : { mode: to });
     return { status, ok: status === 200 && j.ok, mode: j.mode, changed: j.changed, locked: status === 409, error: j.error };
   }
+
+  // ---------- phase 2: every Telegram command has an app twin (the desk runs the SAME Telegram handler) ----------
+  // Changes go: preview (the handler's own Yes/No question comes back as a proposal) -> confirm sheet -> /api/confirm with an
+  // idempotency key, so a double tap can't order twice. Nothing here decides anything: the desk's checks answer.
+  const BOTS5 = ["scanner", "analyst", "brain", "executor", "risk"];
+  const canCtl = () => !!ctlAuth();
+  function idem() { const a = new Uint8Array(18); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  async function api(path, body, ms) {
+    try { return await ctlFetch(path, body, ms); } catch (e) { return { status: 0, j: { ok: false, error: e.code === "notoken" ? "notoken" : "network" } }; }
+  }
+  const apiText = (j) => ((j && j.messages) || []).map((m) => m.text).join("\n");
+  function apiErr(r) {
+    const j = r.j || {};
+    if (r.status === 0) return j.error === "notoken" ? "No control token on this device" : "Network error: the desk didn't answer. Nothing changed.";
+    if (r.status === 401) return "The desk refused this device. Nothing changed.";
+    if (r.status === 429) return "Too many tries: wait a minute. Nothing changed.";
+    if (r.status === 503) return j.message || "The desk isn't running right now.";
+    if (r.status === 504) return j.message || "The desk is busy. Nothing was done.";
+    if (r.status === 409 && j.error === "expired") return "That confirm expired. Start again.";
+    return j.message || "Not done. Nothing changed.";
+  }
+  const nl2br = (t) => esc(t).replace(/\n/g, "<br>");
+  function sheet(html) {
+    const sh = $("#sheet"); sh.innerHTML = `<div class="in"><div class="grab"></div>${html}<button class="btn" style="width:100%;margin-top:12px" data-act="closesheet">Close</button></div>`;
+    sh.hidden = false; sh.onclick = (e) => { if (e.target === sh) closeSheet(); }; return sh;
+  }
+  function closeSheet() { const sh = $("#sheet"); sh.hidden = true; if (sh.onclose) { const f = sh.onclose; sh.onclose = null; f(); } }
+  const setMsg = (t, k) => { const m = $("#p2msg"); if (m) { m.innerHTML = nl2br(t); m.dataset.k = k || ""; } };
+  const modeRow = (m) => `<div><span>Mode</span><b class="${m === "LIVE" ? "down" : ""}">${m === "LIVE" ? "🟢 LIVE · real money" : "🧪 PAPER · no real money"}</b></div>`;
+  function haptic(k) { try { S.tg && S.tg.HapticFeedback && S.tg.HapticFeedback.notificationOccurred(k); } catch {} }
+
+  // confirm step shared by buy / sell / set / copy: one idempotency key per sheet, the button locks on the first tap
+  function confirmStep(pid, label, cls, onDone) {
+    const key = idem(), go = $("#p2go"); if (!go) return;
+    go.textContent = label; go.className = `btn ${cls}`; go.disabled = false;
+    go.onclick = async () => {
+      if (go.disabled) return; go.disabled = true; go.classList.add("dis"); go.textContent = "Sending…"; setMsg("Sending to the desk…", "busy");
+      const r = await api("/api/confirm", { pid, idem: key }, 30000);
+      if (r.status === 200 && r.j.ok) { go.textContent = "Done ✓"; setMsg(apiText(r.j) || "Done.", "ok"); haptic("success"); onDone && onDone(r.j, true); }
+      else { go.textContent = "Not done"; setMsg(apiErr(r), "err"); haptic("error"); onDone && onDone(r.j, false); }
+    };
+  }
+
+  // ---- Buy / Sell (picks, coins, open positions). Brain sizes the buy; Executor keeps its RE-CHECK + amount read-back.
+  async function openTrade(kind, mint, label) {
+    const name = label || (mint || "").slice(0, 6);
+    if (kind === "sell") {
+      sheet(`<div class="p2t">Sell ${esc(name)}</div><div class="ro">How much of the position?</div>
+        <div class="btns" style="margin-top:10px"><button class="btn" data-p2pct="50">Half</button><button class="btn" data-p2pct="100">All</button></div>
+        <div class="ro p2msg" id="p2msg"></div>`);
+      document.querySelectorAll("[data-p2pct]").forEach((b) => b.onclick = () => tradePreview("sell", mint, name, +b.dataset.p2pct));
+      return;
+    }
+    tradePreview("buy", mint, name);
+  }
+  async function tradePreview(kind, mint, name, pct) {
+    sheet(`<div class="p2t">${kind === "buy" ? "Buy" : "Sell"} ${esc(name)}</div><div class="mrows" id="p2rows">${sk(36)}${sk(36)}</div>
+      <div class="ro p2msg" id="p2msg" data-k="busy">${kind === "buy" ? "Analyst is auditing it (8 layers), then Brain sizes it…" : "Checking the position…"}</div>
+      <button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>${kind === "buy" ? "Buy" : "Sell"}</button>`);
+    const r = await api(kind === "buy" ? "/api/buy" : "/api/sell", kind === "buy" ? { coin: mint } : { coin: mint, pct }, kind === "buy" ? 110000 : 30000);
+    const rows = $("#p2rows"); if (!rows) return;
+    const p = r.status === 200 && r.j.proposal;
+    if (!p) { rows.innerHTML = ""; setMsg(r.status === 200 ? apiText(r.j) || "The desk said no." : apiErr(r), "err"); $("#p2go").textContent = "Not possible"; return; }
+    rows.innerHTML = kind === "buy"
+      ? `<div><span>Coin</span><b>${esc(p.symbol)} · ${esc(p.mint.slice(0, 4))}…${esc(p.mint.slice(-4))}</b></div>
+         <div><span>Size (Brain)</span><b>${money(p.size_usd)}${p.pct_of_cash != null ? ` · ${Math.round(p.pct_of_cash)}% of cash` : ""}</b></div>
+         <div><span>Analyst score</span><b>${p.score != null ? esc(p.score) : "–"}</b></div>${modeRow(p.mode)}`
+      : `<div><span>Coin</span><b>${esc(p.symbol)}</b></div><div><span>Sell</span><b>${p.pct === 100 ? "All" : "Half"} (${esc(p.pct)}%)${p.size_usd != null ? ` of ${money(p.size_usd)} in` : ""}</b></div>${modeRow(p.mode)}`;
+    setMsg(kind === "buy" ? `Executor re-checks price and liquidity, types ${money(p.size_usd)} and reads the amount back to the cent before it clicks; any mismatch aborts.` : "Executor sells on FOMO and verifies the fill.", "");
+    confirmStep(p.pid, kind === "buy" ? `Confirm buy ${money(p.size_usd)}` : `Confirm sell ${p.pct === 100 ? "all" : "half"}`, p.mode === "LIVE" ? "red" : "primary");
+  }
+
+  // ---- Why (Analyst reasons) on a coin
+  async function loadWhy(mint) {
+    const box = $("#whybox"); if (!box) return; box.innerHTML = sk(60);
+    const r = await api("/api/why", { coin: mint });
+    box.innerHTML = `<div class="card p2why">${r.status === 200 ? nl2br(apiText(r.j)) : esc(apiErr(r))}</div>`;
+  }
+
+  // ---- Pause / Resume (header control)
+  function pausedNow() {
+    if (S.ctl.s && S.ctl.st === "ok" && Array.isArray(S.ctl.s.paused)) return new Set(S.ctl.s.paused);
+    return new Set(((S.state && S.state.bots) || []).filter((b) => b.status === "paused").map((b) => b.name.toLowerCase()));
+  }
+  async function openBots() {
+    await ctlPoll(); const pz = pausedNow(); let armed = null;
+    const draw = () => {
+      const p2 = pausedNow();
+      $("#p2bots").innerHTML = BOTS5.map((b) => { const on = p2.has(b), arm = armed === b;
+        return `<div class="row"><div class="tx"><div class="t1">${b[0].toUpperCase() + b.slice(1)}</div><div class="t2">${on ? "⏸ paused" : "running"}</div></div>
+          <button class="btn sm ${arm ? (on ? "primary" : "red") : ""}" data-p2bot="${b}">${arm ? (on ? "Confirm resume" : "Confirm pause") : on ? "Resume" : "Pause"}</button></div>`; }).join("");
+      document.querySelectorAll("[data-p2bot]").forEach((x) => x.onclick = async () => {
+        const b = x.dataset.p2bot;
+        if (armed !== b) { armed = b; draw(); return; }
+        armed = null; x.disabled = true; x.textContent = "…";
+        const r = await api("/api/pause", { bot: b, on: !pausedNow().has(b), idem: idem() });
+        if (r.status === 200) { if (S.ctl.s) S.ctl.s.paused = r.j.paused; setMsg(apiText(r.j), r.j.changed ? "ok" : "err"); haptic(r.j.changed ? "success" : "warning"); }
+        else setMsg(apiErr(r), "err");
+        draw(); render(true);
+      });
+    };
+    sheet(`<div class="p2t">Bots</div><div class="ro">Pause or resume a bot. Tap twice: the second tap confirms. Telegram confirms too.</div>
+      <div class="list plain p2list" id="p2bots"></div><div class="ro p2msg" id="p2msg">${pz.size ? `Paused now: ${[...pz].join(", ")}` : "All bots running."}</div>`);
+    draw();
+  }
+
+  // ---- Trading window (/time)
+  async function openWindow() {
+    sheet(`<div class="p2t">Trading window</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
+    const r = await api("/api/time"); if (r.status !== 200) return setMsg(apiErr(r), "err");
+    const on = r.j.window_enabled, go = $("#p2go"); setMsg(apiText(r.j), "");
+    go.disabled = false; go.className = "btn"; go.textContent = on ? "Turn window OFF (buys 24/7)" : "Turn window ON (night only)"; let armed = false; const key = idem();
+    go.onclick = async () => {
+      if (!armed) { armed = true; go.className = "btn red"; go.textContent = on ? "Confirm: buys 24/7, no morning sell-off" : "Confirm: night window back"; return; }
+      go.disabled = true; go.textContent = "Sending…";
+      const x = await api("/api/time_set", { on: !on, idem: key });
+      if (x.status === 200) { go.textContent = "Done ✓"; setMsg(apiText(x.j), "ok"); if (S.ctl.s) S.ctl.s.window_enabled = x.j.window_enabled; } else { go.textContent = "Not done"; setMsg(apiErr(x), "err"); }
+    };
+  }
+  async function openReport() {
+    sheet(`<div class="p2t">Morning report</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><div id="p2links"></div>`);
+    const r = await api("/api/report"); if (r.status !== 200) return setMsg(apiErr(r), "err");
+    setMsg(apiText(r.j), ""); const u = ((r.j.messages || [])[0] || {}).text || ""; const m = u.match(/https:\/\/\S+/);
+    if (m) $("#p2links").innerHTML = `<a class="btn primary" style="margin-top:12px" href="${esc(m[0])}" target="_blank" rel="noopener noreferrer">Open the morning Page</a>`;
+  }
+
+  // ---- Settings (/set): same keys, limits and validation as Telegram (the desk checks; the form only helps)
+  async function loadSettings(force) {
+    if (S.setList && !force) return; S.setList = S.setList || null; S.setErr = null;
+    const r = await api("/api/settings"); if (r.status === 200) S.setList = r.j.settings; else S.setErr = apiErr(r);
+    if (S.stack.length && S.stack[S.stack.length - 1].kind === "settings") render(true);
+  }
+  const showVal = (x) => x.masked ? (x.value ? "set" : "not set") : x.type === "bool" ? (x.value ? "on" : "off") : Array.isArray(x.value) ? x.value.join(", ") : String(x.value);
+  function viewSettings() {
+    if (!S.setList) return backBar("Account") + `<h1 class="title">Settings</h1>` + (S.setErr ? `<div class="empty"><b>Can't load settings</b>${esc(S.setErr)}</div>` : sk(60) + sk(60) + sk(60));
+    const groups = {}; S.setList.forEach((x) => (groups[x.group] = groups[x.group] || []).push(x));
+    const order = ["risk", "brain", "executor", "analyst", "scanner", "social", "desk", "copy_picks", "browser"];
+    return backBar("Account") + `<h1 class="title">Settings</h1><div class="ro">Same settings and limits as /set in Telegram. Every change asks you to confirm, lands in the change log and Telegram confirms it.</div>
+      ${order.filter((g) => groups[g]).map((g) => `<div class="grp">${esc(g.replace("_", " "))}</div><div class="list plain">${groups[g].map((x) => `<button class="row" data-act="setkey" data-k="${esc(x.key)}" style="width:100%;text-align:left"><div class="tx"><div class="t1">${esc(x.alias || x.key.split(".")[1].replace(/_/g, " "))}</div><div class="t2">${esc(x.key)}${x.range ? " · " + esc(x.range) : ""}</div></div><span class="sv">${esc(showVal(x))}</span><span class="ter">›</span></button>`).join("")}</div>`).join("")}`;
+  }
+  function openSet(key) {
+    const x = (S.setList || []).find((s) => s.key === key); if (!x) return;
+    const num = x.type === "int" || x.type === "float";
+    const input = x.type === "bool" ? `<div class="btns"><button class="btn ${x.value ? "primary" : ""}" data-p2b="true">On</button><button class="btn ${!x.value ? "primary" : ""}" data-p2b="false">Off</button></div><input type="hidden" id="p2val" value="${x.value ? "true" : "false"}">`
+      : `<input id="p2val" class="livein p2in" ${num ? `inputmode="decimal" type="text"` : `type="text"`} value="${x.masked ? "" : esc(showVal(x))}" placeholder="${x.type === "time" ? "HH:MM" : ""}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+    sheet(`<div class="p2t">${esc(x.alias || x.key)}</div><div class="ro">${esc(x.key)} · now <b>${esc(showVal(x))}</b>${x.range ? " · " + esc(x.range) : ""}</div>${input}
+      <div class="ro p2msg" id="p2msg"></div><button class="btn primary" id="p2go" style="width:100%;margin-top:12px">Review change</button>`);
+    document.querySelectorAll("[data-p2b]").forEach((b) => b.onclick = () => { $("#p2val").value = b.dataset.p2b; document.querySelectorAll("[data-p2b]").forEach((y) => y.classList.toggle("primary", y === b)); });
+    const go = $("#p2go");
+    go.onclick = async () => {
+      const v = $("#p2val").value.trim(); if (!v) return setMsg("Type a value", "err");
+      go.disabled = true; go.textContent = "Checking…";
+      const r = await api("/api/set", { key, value: v });
+      const p = r.status === 200 && r.j.proposal;
+      if (!p) { go.disabled = false; go.textContent = "Review change"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
+      setMsg(apiText(r.j), ""); const inp = $("#p2val"); if (inp) inp.disabled = true;
+      confirmStep(p.pid, "Confirm change", "red", (j, ok) => { if (ok) loadSettings(true); });
+    };
+  }
+
+  // ---- Social: invite (links.py SIGNUP_URL from the desk), copy traders on/off (copy_on, same as /copy), withdraw note
+  async function loadSocial(force) {
+    if (S.social && !force) return;
+    const [inv, cl] = await Promise.all([api("/api/invite"), api("/api/copy_list")]);
+    S.social = { invite: inv.status === 200 ? ((inv.j.messages || [])[0] || {}).links || [] : null, copy: cl.status === 200 ? cl.j : null, err: cl.status === 200 ? null : apiErr(cl) };
+    render(true);
+  }
+  function copyFacts() { return S.social && S.social.copy; }
+  function copyIsOn(h) { const f = copyFacts(); if (S.copyOpt && h in S.copyOpt) return S.copyOpt[h]; if (f && f.on_handles) return f.on_handles.includes(h); return null; }
+  function copyNote(f) {
+    if (!f) return "";
+    if (!f.copy_runs) return `<div class="p2note warn">Copy on desk isn't running in this desk process: switching a trader on is refused until it runs.</div>`;
+    return `<div class="p2note ${f.running_mode === "LIVE" ? "live" : ""}"><b>Switching a trader ON starts copy trades now</b> (${f.running_mode === "LIVE" ? "LIVE · real money" : "PAPER"}): their new buys go through the 8 layers, ${esc(f.size_pct)}% size, ${esc(f.stop_pct)}% own stop, max ${esc(f.max_on)} traders.
+      ${f.lists_every === "off" ? "Copy picks lists are OFF (copy_picks.every = off): that only stops new picks lists; it doesn't stop copying the traders you switch on." : `New picks lists: every ${esc(f.lists_every)}.`}</div>`;
+  }
+  function viewSocial() {
+    const so = S.social, cp = S.files.account && S.files.account.copy_picks, f = copyFacts();
+    const traders = cp && cp.lists && cp.lists[0] ? cp.lists[0].rows : [];
+    const inv = so && so.invite && so.invite[0];
+    return backBar("Account") + `<h1 class="title">Social</h1>
+      <div class="grp">Invite</div><div class="list plain"><div class="row"><div class="tx"><div class="t1">Invite a friend to FOMO</div><div class="t2">${inv ? esc(inv.url.replace(/^https:\/\//, "")) : so ? "–" : "loading…"}</div></div>${inv ? `<button class="btn sm primary" data-act="p2invite">Share</button>` : ""}</div></div>
+      <div class="grp">Copy on desk</div>${so ? (f ? copyNote(f) : `<div class="p2note warn">${esc(so.err || "")}</div>`) : sk(70)}
+      <div class="list plain">${traders.length ? traders.map((r) => { const on = copyIsOn(r.handle) ?? r.copy_on;
+        return `<div class="row"><div class="tx"><div class="t1">${esc(r.handle)}</div><div class="t2">#${esc(r.rank)} on today's list${f && f.on_handles.includes(r.handle) ? " · copying" : ""}</div></div><button class="sw ${on ? "on" : ""} live" data-act="copysw" data-h="${esc(r.handle)}" aria-pressed="${!!on}" aria-label="Copy ${esc(r.handle)}"><i></i></button></div>`; }).join("")
+        : `<div class="row"><div class="tx"><div class="t1">No copy picks list yet</div><div class="t2">Traders show up here when a list exists</div></div></div>`}</div>
+      ${f && f.on_handles.length ? `<div class="ro">Copying now: ${f.on_handles.map(esc).join(", ")}</div>` : ""}
+      <div class="grp">Withdraw</div><div class="list plain"><div class="row"><div class="tx"><div class="t1">Withdraw in FOMO yourself</div><div class="t2">The desk never withdraws. Open FOMO and withdraw there.</div></div></div></div>`;
+  }
+  // optimistic switch: flips at once, rolls back on cancel, refusal or error; the desk's copy_on table is the truth
+  async function copySwitch(h) {
+    if (!canCtl()) return toast("No control token on this device");
+    if (!S.social) await loadSocial();
+    const was = !!(copyIsOn(h) ?? false), want = !was;
+    S.copyOpt = Object.assign(S.copyOpt || {}, { [h]: want }); render(true);
+    const rollback = (msg) => { delete S.copyOpt[h]; render(true); if (msg) toast(msg); };
+    const f = copyFacts();
+    const sh = sheet(`<div class="p2t">Copy ${esc(h)}: ${want ? "ON" : "OFF"}</div>${want ? copyNote(f) : ""}<div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div>
+      <button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
+    let settled = false; sh.onclose = () => { if (!settled) rollback(); };
+    const r = await api("/api/copy", { handle: h, on: want });
+    const p = r.status === 200 && r.j.proposal;
+    if (!p) { settled = true; rollback(); const g = $("#p2go"); if (g) g.textContent = "Not switched"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
+    setMsg(apiText(r.j), "");
+    confirmStep(p.pid, want ? (p.mode === "LIVE" ? "Confirm: copy with real money" : "Confirm copy ON") : "Confirm copy OFF", want && p.mode === "LIVE" ? "red" : "primary", (j, ok) => {
+      settled = true;
+      if (ok && j.applied) { S.social.copy = Object.assign(S.social.copy || {}, j); delete S.copyOpt[h]; render(true); }
+      else rollback(ok ? "The desk didn't switch it (see the message)" : "Not switched");
+    });
+  }
   function setv(key) { const g = (S.files.settings || {}).groups || {}; for (const rows of Object.values(g)) for (const r of rows) if (r.key === key) return r.value; return null; }
   function curMode() { return (S.ctl.s && S.ctl.st === "ok" && S.ctl.s.mode) || (S.files.account && S.files.account.mode) || (S.state && S.state.mode); }
   function openMode(to) {
     const cur = curMode(); if (!to || to === cur) return;
-    if (!DeskCrypto.appToken()) { S.ctl.st = "notoken"; render(); toast("No control token on this device"); return; }
+    if (!ctlAuth()) { S.ctl.st = "notoken"; render(); toast("No control token on this device"); return; }
     const cs = S.ctl.st === "ok" ? S.ctl.s : null;
     const sh = $("#sheet"), live = to === "LIVE";
     const pb = (cs && cs.per_buy) || {}, lc = (cs && cs.loss_cap) || {};
@@ -895,9 +1131,33 @@
   addEventListener("hashchange", () => { if (fxFlag()) { stripFxFlag(); if (S.state) fxDemo(); } });
 
   // ---------- start ----------
+  // ---------- Telegram Mini App: telegram-web-app.js only when we are inside Telegram ----------
+  const inTelegram = () => /[#&?]tgWebApp(Data|Version|Platform)=/.test(location.hash + "&" + location.search) || !!window.TelegramWebviewProxy || !!window.__TG_TEST;
+  function loadTelegram() {
+    return new Promise((ok) => {
+      if (window.Telegram && window.Telegram.WebApp) return ok(window.Telegram.WebApp);
+      const s = document.createElement("script"); s.src = "https://telegram.org/js/telegram-web-app.js"; s.async = true;
+      const t = setTimeout(() => ok(null), 6000);
+      s.onload = () => { clearTimeout(t); ok((window.Telegram && window.Telegram.WebApp) || null); }; s.onerror = () => { clearTimeout(t); ok(null); };
+      document.head.appendChild(s);
+    });
+  }
+  async function setupTelegram() {
+    if (!inTelegram()) return;
+    const w = await loadTelegram(); if (!w || !w.initData) return;
+    S.tg = w; document.documentElement.classList.add("tg");
+    try { w.ready(); w.expand(); w.setHeaderColor("#07090f"); w.setBackgroundColor("#04090b"); if (w.setBottomBarColor) w.setBottomBarColor("#04090b"); } catch {}
+    const tp = w.themeParams || {}; if (tp.link_color) document.documentElement.style.setProperty("--tg-link", tp.link_color);   // light touch: links only, our dark-teal stays
+    try { w.BackButton.onClick(() => history.back()); } catch {}
+    if (!DeskCrypto.dataPath()) {      // the webview has no #d= link: the desk hands the data key to a validated initData session (memory only)
+      const r = await api("/api/datakey"); if (r.status === 200 && r.j.d) S.tgDp = r.j.d;
+    }
+  }
+  function tgBack() { try { if (S.tg) S.stack.length ? S.tg.BackButton.show() : S.tg.BackButton.hide(); } catch {} }
   async function start() {
     const wantDemo = fxFlag(); stripFxFlag();
-    S.dp = DeskCrypto.dataPath(); // takes #d= into localStorage; strips it only in the home-screen app (iOS storage is separate)
+    await setupTelegram();
+    S.dp = DeskCrypto.dataPath() || S.tgDp; // takes #d= into localStorage; strips it only in the home-screen app (iOS storage is separate)
     S.a2hs = !DeskCrypto.isStandalone() && DeskCrypto.linkInUrl() && localStorage.getItem("desk.a2hs.off") !== "1";
     if (S.a2hs) showA2hs();
     if (window.__DESK_FIXTURE) { fixture(window.__DESK_FIXTURE); if (wantDemo) setTimeout(fxDemo, 800); return; }
