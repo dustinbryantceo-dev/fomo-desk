@@ -7,7 +7,7 @@
   const BOT_ORDER = ["scanner", "analyst", "brain", "executor", "risk"];
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fomoLink = (u) => (typeof u === "string" && /^https:\/\/fomo\.family\//.test(u) ? u : null); // check only, never build
+  const fomoLink = (u) => (!S.viewer && typeof u === "string" && /^https:\/\/fomo\.family\//.test(u) ? u : null); // check only, never build
   const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---------- formatting (never a made-up number: null -> "–") ----------
@@ -188,7 +188,7 @@
     return `
       <header class="pphead">
         <div class="brand">${LOGO}<div><div class="bname">Pump <span>Pilot</span></div><div class="btag">FOMO desk · ${running}/5 bots online</div></div></div>
-        <div class="navsp"></div><span id="mbadge">${modeBadge()}</span>
+        <div class="navsp"></div>${S.viewer ? '<span class="vbadge">👀 VIEW ONLY</span>' : ""}<span id="mbadge">${modeBadge()}</span>
         ${canCtl() ? `<button class="iconbtn ${pausedNow().size ? "paused" : ""}" data-act="bots" aria-label="Pause or resume bots">${pausedNow().size ? ICON.play : ICON.pause}${pausedNow().size ? '<i class="dot amber"></i>' : ""}</button>` : ""}
         <button class="iconbtn" data-act="search" aria-label="Search">${ICON.search}</button>
         <button class="iconbtn" data-act="tab" data-tab="activity" aria-label="Activity">${ICON.bell}${unseen ? '<i class="dot"></i>' : ""}</button>
@@ -219,7 +219,7 @@
           ${S.demo ? `<div class="plist">${demoRow()}</div>` : ""}
           ${pos.length ? `<div class="plist">${pos.map(posCard).join("")}</div>` : S.demo ? "" : '<div class="empty glass"><b>No open positions</b>Risk is watching for the next entry.</div>'}
         </section>
-        <section class="a-frame">
+        <section class="a-frame"${S.viewer ? " hidden" : ""}>
           <h2 class="sec">FOMO screen ${frameNote(scr)}</h2>
           <div class="live glass">
             <div class="frame" id="liveframe" data-act="full">
@@ -512,7 +512,7 @@
       <div class="stats"><div><span>Market cap</span><b>${compact(c.market_cap_usd)}</b></div><div><span>Liquidity</span><b>${compact(c.liquidity_usd)}</b></div><div><span>Holders</span><b>${c.holders != null ? c.holders.toLocaleString() : "–"}</b></div></div>
       ${p ? `<div class="card poscard"><div class="tx" style="flex:1"><div class="t1">Your position · ${money(p.size_usd)} in · Executor</div><div class="t2 mut" style="font-size:13px;margin-top:3px">now ${money(p.value_usd)} · stop ${priceFmt(c.exit_line)}</div></div></div>` : `<div class="card poscard"><span class="mut">No open position</span></div>`}
       <div class="btns">${fomoLink(c.link) ? `<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : ""}
-        ${p ? `<button class="btn red" data-act="sell" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Sell…</button>`
+        ${p && !S.viewer ? `<button class="btn red" data-act="sell" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Sell…</button>`
             : canCtl() && String(c.chain || "solana").toLowerCase() === "solana" ? `<button class="btn primary" data-act="buy" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Buy…</button>` : ""}</div>
       <div class="btns" style="margin-top:8px"><button class="btn" data-act="audit" data-mint="${esc(mint)}">Audit</button>${canCtl() ? `<button class="btn" data-act="why" data-mint="${esc(mint)}">Why? (Analyst)</button>` : ""}</div>
       <div id="whybox"></div>`;
@@ -534,7 +534,53 @@
       <div class="social">${esc(a.social_line || "Social: off")}</div>`;
   }
 
+  // ---- VIEWER mode Account: read only. No mode switch, no controls, no settings, no Dustin notification prefs; only this
+  // phone's own trade alerts (buy / sell / take profit / stop / Starship), which go away when the link is revoked.
+  function viewViewerAccount() {
+    const st = S.state || {}, v = S.vw || {};
+    const pushRow = pushEnv() !== "ok" ? `<div class="row"><div class="tx"><div class="t1">Trade alerts</div><div class="t2">${pushEnv() === "a2hs" ? "On iPhone: Share → Add to Home Screen, open it from the icon, then turn alerts on here." : "This browser can't show push notifications."}</div></div></div>`
+      : `<div class="row"><div class="tx"><div class="t1">Trade alerts on this phone</div><div class="t2">${v.sub ? "On: buys, sells, take profits, stops" : "Off · buys, sells, take profits and stops only"}</div></div>
+          <button class="sw ${v.sub ? "on" : ""}" data-act="vpush" aria-pressed="${!!v.sub}" aria-label="Trade alerts"><i></i></button></div>`;
+    return `<h1 class="title">Account</h1>
+      <div class="vonly glass"><div class="t1">👀 VIEW ONLY</div><div class="t2">You're watching Pump Pilot with a read-only link: balance, charts, replay, positions, history and bot activity. No controls, no settings, nothing here can trade.</div></div>
+      <div class="grp">Desk</div><div class="list plain">
+        <div class="row"><div class="tx"><div class="t1">Mode</div><div class="t2">${esc(st.mode || "–")}${st.mode === "LIVE" ? " · real money" : ""}</div></div></div>
+        <div class="row"><div class="tx"><div class="t1">Cash</div><div class="t2">${money(st.cash)}</div></div></div></div>
+      <div class="grp">Notifications</div><div class="list plain">${pushRow}</div><div class="ro p2msg" id="vmsg"></div>
+      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
+      <div class="ter" style="font-size:12px;text-align:center;margin:20px 0">Last update ${hm(S.lastIxT)} · view only</div>`;
+  }
+  async function vFetch(path, body) {
+    const tok = await DeskCrypto.viewerApiToken(S.vk || "");
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000);
+    try {
+      const r = await fetch(API + path, { method: "POST", mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal,
+        headers: { Authorization: "Viewer " + tok, "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+      let j = {}; try { j = await r.json(); } catch {} return { status: r.status, j };
+    } catch { return { status: 0, j: {} }; } finally { clearTimeout(tm); }
+  }
+  async function viewerHello() {
+    const r = await vFetch("/api/viewer/hello", {}); S.vw = Object.assign(S.vw || {}, { key: r.j.vapid_public_key, revoked: r.status === 401 });
+    try { const sub = await localSub(); S.vw.sub = !!(sub && localStorage.getItem("desk.vsub") === sub.endpoint); } catch {}
+    if (S.tab === "account") render(true);
+  }
+  async function viewerPush() {
+    const vm = (t) => { const m = $("#vmsg"); if (m) m.textContent = t; };
+    if (!S.vw || !S.vw.key) { await viewerHello(); if (!S.vw.key) return vm(S.vw.revoked ? "This viewer link was turned off." : "Can't reach the desk right now."); }
+    if (S.vw.sub) {
+      const sub = await localSub(); const ep = sub && sub.endpoint; if (sub) { try { await sub.unsubscribe(); } catch {} }
+      if (ep) await vFetch("/api/viewer/unsubscribe", { endpoint: ep }); localStorage.removeItem("desk.vsub"); S.vw.sub = false; render(true); return vm("Trade alerts are off on this phone.");
+    }
+    let perm; try { perm = PF() ? await PF().requestPermission() : await Notification.requestPermission(); } catch { perm = "default"; }
+    if (perm !== "granted") return vm("Not allowed. Tap again and choose Allow.");
+    let sub; try { const reg = await swReg(); sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(S.vw.key) })); }
+    catch (e) { return vm("This phone couldn't turn alerts on (" + (e.name || "error") + ")."); }
+    const j = sub.toJSON ? sub.toJSON() : sub, r = await vFetch("/api/viewer/subscribe", { subscription: j });
+    if (r.status !== 200) return vm(r.status === 401 ? "This viewer link was turned off." : (r.j.message || "The desk said no."));
+    localStorage.setItem("desk.vsub", j.endpoint); S.vw.sub = true; haptic("success"); render(true); vm("Trade alerts are on: buys, sells, take profits, stops.");
+  }
   function viewAccount() {
+    if (S.viewer) return viewViewerAccount();
     const ac = S.files.account, se = S.files.settings, st = S.state;
     if (!ac) return `<h1 class="title">Account</h1>${sk(36)}${sk(60)}${sk(60)}${sk(200)}`;
     const groups = se ? se.groups : {};
@@ -559,6 +605,7 @@
       </div>
       ${canCtl() ? `<div class="grp">Control</div><div class="list plain">
         <button class="row" data-act="settingsv" style="width:100%;text-align:left"><div class="tx"><div class="t1">Settings</div><div class="t2">Stop, take profit, trail, sizes… same as /set, with confirm</div></div><span class="ter">›</span></button>
+        <div class="row"><div class="tx"><div class="t1">👀 Viewer link</div><div class="t2">${viewerLine()}</div></div></div>
         <button class="row ssrow" data-act="starship" style="width:100%;text-align:left"><span class="ssico">🚀</span><div class="tx"><div class="t1">Starship Mode</div><div class="t2">${ssAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window &amp; buy timer</div><div class="t2">${winAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="bots" style="width:100%;text-align:left"><div class="tx"><div class="t1">Pause / resume bots</div><div class="t2">${pausedNow().size ? "Paused: " + esc([...pausedNow()].join(", ")) : "All running"}</div></div><span class="ter">›</span></button>
@@ -648,10 +695,13 @@
     paintScreen(); liveLabel(); fxPlay(); tgBack();
   }
 
+  const VIEWER_BLOCK = new Set(["pushon", "pushoff", "pushtest", "evsw", "quietsw", "maintloud", "quietsave", "tgsw", "notif", "mode", "bots", "window", "starship", "settingsv", "setkey", "social",
+    "copysw", "buy", "sell", "why", "report", "sstoggle", "ssfor", "sscap", "wtimer", "wtoggle", "wsave", "wcancel", "wstopat", "invite", "pausebot", "confirm"]);
   // ---------- actions ----------
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-act]"); if (!t || e.target.closest("a")) return;
     const act = t.dataset.act;
+    if (S.viewer && VIEWER_BLOCK.has(act)) return;      // viewer mode: no control ever starts from a tap (belt and braces)
     if (act === "tab") go(t.dataset.tab);
     else if (act === "back") history.back();
     else if (act === "range") { S.range = t.dataset.r; await getFile("chart/" + S.range).catch(() => {}); render(); }
@@ -661,6 +711,7 @@
     else if (act === "more") { for (let i = 0; i < 10; i++) if (!S.files["activity/" + i]) { await getFile("activity/" + i).catch(() => {}); break; } render(); }
     else if (act === "search") openSearch();
     else if (act === "full") openFull();
+    else if (act === "sell" && S.viewer) return;
     else if (act === "sell") { if (canCtl()) openTrade("sell", t.dataset.mint, t.dataset.sym); else openSell(t.dataset.mint); }
     else if (act === "buy") openTrade("buy", t.dataset.mint, t.dataset.sym);
     else if (act === "why") loadWhy(t.dataset.mint);
@@ -681,6 +732,7 @@
     else if (act === "social") { push({ kind: "social" }); loadSocial(true); }
     else if (act === "copysw") copySwitch(t.dataset.h);
     else if (act === "notif") { push({ kind: "notif" }); loadNotif(true); }
+    else if (act === "vpush" && S.viewer) viewerPush();
     else if (act === "pushon") pushEnable();
     else if (act === "pushoff") pushDisable();
     else if (act === "pushtest") pushTest();
@@ -768,7 +820,7 @@
   // Changes go: preview (the handler's own Yes/No question comes back as a proposal) -> confirm sheet -> /api/confirm with an
   // idempotency key, so a double tap can't order twice. Nothing here decides anything: the desk's checks answer.
   const BOTS5 = ["scanner", "analyst", "brain", "executor", "risk"];
-  const canCtl = () => !!ctlAuth();
+  const canCtl = () => !S.viewer && !!ctlAuth();       // a VIEWER link never controls anything (the server refuses it too)
   function idem() { const a = new Uint8Array(18); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
   async function api(path, body, ms) {
     try { return await ctlFetch(path, body, ms); } catch (e) { return { status: 0, j: { ok: false, error: e.code === "notoken" ? "notoken" : "network" } }; }
@@ -995,6 +1047,11 @@
   function ssSet(x) { S.ss = x; S.ss._skew = Date.now() / 1000 - (x.server_ts || Date.now() / 1000); }
   const ssNow = () => Date.now() / 1000 - ((S.ss && S.ss._skew) || 0);
   function ssState() { const c = (S.ctl.s || {}).starship; return S.ss ? { enabled: S.ss.enabled, until_ts: S.ss.until_ts } : c || null; }
+  function viewerLine() {
+    const v = (S.ctl.s || {}).viewer; if (!v) return "Read-only link to forward · Telegram: /viewer";
+    if (!v.active) return "OFF · send /viewer in Telegram to make a read-only link";
+    return `ON since ${romeHM(v.created_ts)} Rome · ${v.first_open_ts ? "opened " + romeHM(v.first_open_ts) : "not opened yet"} · ${v.devices || 0} alert device${v.devices === 1 ? "" : "s"} · /viewer revoke`;
+  }
   function ssAccountLine() {
     const x = ssState(); if (!x) return "Riskier sniper mode · OFF by default";
     return x.enabled ? `ON${x.until_ts ? " · until " + romeHM(x.until_ts) + " Rome" : " · no timer"} · half size, tight stop` : "OFF · riskier sniper mode for more trades";
@@ -1376,7 +1433,8 @@
     lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"],
     maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"], timer: ["Buy timer", "Timer started, cancelled, and when it ends"],
     window: ["Trading window", "Window turned on / off, hours changed"],
-    starship: ["🚀 Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["🚀 Starship trades", "Each Starship buy, take profit and exit"] };
+    starship: ["🚀 Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["🚀 Starship trades", "Each Starship buy, take profit and exit"],
+    viewer: ["👀 Viewer link", "Created, revoked, first opened"] };
   const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
   function pushEnv() {
@@ -1528,12 +1586,16 @@
     const wantDemo = fxFlag(); stripFxFlag(); tabFromUrl();
     await setupTelegram();
     S.dp = DeskCrypto.dataPath() || S.tgDp; // takes #d= into localStorage; strips it only in the home-screen app (iOS storage is separate)
+    const vk = DeskCrypto.viewerKey();      // VIEWER link: viewer key + no control token -> read-only viewer mode
+    if (vk && !DeskCrypto.appToken() && !S.tg) { S.viewer = true; S.vk = vk; S.dp = vk; document.documentElement.classList.add("viewer"); }
+    if (window.__VIEWER_TEST) { S.viewer = true; document.documentElement.classList.add("viewer"); }
     S.a2hs = !DeskCrypto.isStandalone() && DeskCrypto.linkInUrl() && localStorage.getItem("desk.a2hs.off") !== "1";
     if (S.a2hs) showA2hs();
     if (window.__DESK_FIXTURE) { fixture(window.__DESK_FIXTURE); applyWantTab(); if (wantDemo) setTimeout(fxDemo, 800); return; }
     if (!S.dp) { render(); if (wantDemo) setTimeout(() => toast("Open your desk link first, then replay"), 500); return; }
     S.desk = await DeskCrypto.open(S.dp, BASE);
     render(); await poll(); applyWantTab();
+    if (S.viewer) viewerHello();
     if (wantDemo) setTimeout(fxDemo, 600);
     setInterval(poll, POLL_S * 1000);
     setInterval(() => { const g = $("#gaten"); if (g) g.textContent = Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000)); }, 1000);

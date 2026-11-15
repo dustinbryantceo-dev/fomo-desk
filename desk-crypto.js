@@ -65,7 +65,16 @@ const DeskCrypto = (() => {
     return localStorage.getItem("desk.d");
   }
   function appToken() { takeToken(); return localStorage.getItem("desk.t"); }
-  function linkInUrl() { return /[#&]d=[A-Za-z0-9_-]{32,}/.test(location.hash); }
-  return { open, dataPath, appToken, isStandalone, linkInUrl };
+  // VIEWER link (#v=, 2026-11-15): a separate, read-only data key. Kept like #d= (own storage, stripped in the
+  // home-screen app). The app is in viewer mode when it has a viewer key and NO control token.
+  function viewerKey() {
+    const m = location.hash.match(/[#&]v=([A-Za-z0-9_-]{32,})/);
+    if (m) { localStorage.setItem("desk.v", m[1]); if (isStandalone()) history.replaceState(null, "", location.pathname); }
+    return localStorage.getItem("desk.v");
+  }
+  // what the viewer app sends to /api/viewer/* : hex SHA-256("viewer-api:" + key) (the key itself never leaves the phone)
+  async function viewerApiToken(k) { return hex(await crypto.subtle.digest("SHA-256", enc.encode("viewer-api:" + k))); }
+  function linkInUrl() { return /[#&][dv]=[A-Za-z0-9_-]{32,}/.test(location.hash); }
+  return { open, dataPath, appToken, isStandalone, linkInUrl, viewerKey, viewerApiToken };
 })();
 if (typeof module !== "undefined") module.exports = DeskCrypto;
