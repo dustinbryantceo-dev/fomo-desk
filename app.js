@@ -141,7 +141,7 @@
         <div class="frame" id="liveframe" data-act="full">
           <img alt=""><img alt="">
           ${S.screenUrl ? "" : '<div class="nof">No frame yet</div>'}
-          ${scr.paused ? '<div class="paused">Paused · private<br><span class="ter" style="font-size:13px">a login or withdraw form is open</span></div>' : ""}
+          ${scr.paused ? '<div class="paused"><div>Paused · private<br><span class="ter" style="font-size:13px">a login or withdraw form is open, no frames</span></div></div>' : ""}
           <div class="tl" id="livetl"></div>
           <div class="tr" id="livetr"></div>
         </div>
@@ -163,7 +163,7 @@
   function liveLabel() {
     const tl = $("#livetl"), tr = $("#livetr"); if (!tl || !S.state) return;
     const scr = S.state.screen || {}, ft = scr.frame_ts, fresh = ft && Date.now() / 1000 - ft < 5;
-    tl.innerHTML = !ft ? '<span class="gdot"></span>No frame yet' : fresh ? '<span class="rdot"></span>Live · Bot\'s computer' : `<span class="gdot"></span>Last frame ${hms(ft)}`;
+    tl.innerHTML = scr.paused ? '<span class="gdot"></span>Paused · private' : !ft || !S.screenUrl ? '<span class="gdot"></span>No frame yet' : fresh ? '<span class="rdot"></span>Live · Bot\'s computer' : `<span class="gdot"></span>Last frame ${hms(ft)}`;
     const ln = S.state.lane || {}, holder = scr.lane || ln.bot, text = scr.status && scr.status !== "Idle" ? scr.status : ln.text || "Idle";
     tr.innerHTML = holder && text !== "Idle" ? `<span style="color:${color(holder)}">${esc(text)}</span>` : '<span class="mut">Idle</span>';
   }
