@@ -185,3 +185,13 @@ h2.sec .count{color:var(--sec);font-weight:400}
 .gate h1{font:700 26px var(--disp);margin:0 0 10px}
 .gate p{color:var(--sec);font-size:15px;margin:0 0 8px;max-width:320px}
 .gate .ico svg{width:30px;height:30px;fill:none;stroke:var(--sec);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.cp{background:var(--c1);border-radius:14px;padding:14px;margin-bottom:10px}
+.cp-top{display:flex;justify-content:space-between;align-items:center}.cp-h{font-weight:600;font-size:16px}
+.cp-btn{background:var(--c2);color:#fff;text-decoration:none;border-radius:16px;padding:6px 14px;font-size:13px;font-weight:600}
+.cp-n{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;margin-top:6px}
+.cp-buy{display:flex;justify-content:space-between;margin-top:10px;padding:10px 12px;background:var(--c2);border-radius:10px;color:#fff;text-decoration:none;font-size:14px}
+.cp-why{font-size:12px;margin-top:8px}
+.cp-sw{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:14px}
+.sw{width:44px;height:26px;border-radius:13px;background:#39393d;position:relative;opacity:.7}.sw i{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:11px;background:#fff}
+.sw.on{background:var(--green)}.sw.on i{left:20px}
