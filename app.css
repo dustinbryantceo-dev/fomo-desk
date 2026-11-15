@@ -337,7 +337,6 @@ h1.title{background:linear-gradient(90deg,#fff,#bfe8ff);-webkit-background-clip:
 .fx-sell{animation:fxSell 1.4s ease-out!important}
 @keyframes fxBuy{0%{box-shadow:0 0 0 2px #00f5a0,0 0 40px 4px rgba(0,245,160,.8);background:rgba(0,245,160,.22)}100%{}}
 @keyframes fxSell{0%{box-shadow:0 0 0 2px #00c2ff,0 0 36px 2px rgba(0,194,255,.7);background:rgba(0,194,255,.2)}100%{}}
-@keyframes fxTp{0%,30%{box-shadow:0 0 0 2px #ffd447,0 0 50px 8px rgba(255,201,64,.85);background:rgba(255,201,64,.24)}100%{}}
 @keyframes fxStop{0%{box-shadow:0 0 0 2px #ff4d6d,0 0 40px 4px rgba(255,77,109,.85);background:rgba(255,77,109,.25);transform:translateX(0)}
   8%{transform:translateX(-9px)}16%{transform:translateX(8px)}24%{transform:translateX(-7px)}32%{transform:translateX(6px)}40%{transform:translateX(-4px)}48%{transform:translateX(2px)}56%{transform:translateX(0)}100%{}}
 .ppban{position:fixed;left:50%;top:calc(var(--st) + 12px);transform:translate(-50%,0);z-index:70;padding:10px 16px;border-radius:16px;font-size:15px;
@@ -349,14 +348,15 @@ h1.title{background:linear-gradient(90deg,#fff,#bfe8ff);-webkit-background-clip:
 .ppban.stop{border-color:rgba(255,77,109,.7);box-shadow:0 0 30px rgba(255,77,109,.4)}.ppban.stop b,.ppban.stop span{color:var(--red)}
 .ppban.sell b,.ppban.sell span{color:var(--blue)}
 @keyframes banIn{from{opacity:0;transform:translate(-50%,-16px) scale(.96)}}
-.confetti{position:fixed;width:0;height:0;z-index:69;pointer-events:none}
-.confetti i{position:absolute;width:7px;height:11px;border-radius:2px;opacity:0;animation:conf 1.3s cubic-bezier(.15,.7,.3,1) forwards}
-@keyframes conf{0%{opacity:1;transform:translate(0,0) rotate(0)}70%{opacity:1}100%{opacity:0;transform:translate(var(--x),calc(var(--y) + 70px)) rotate(var(--r))}}
+.arcade{position:fixed;inset:0;width:100vw;height:100vh;z-index:68;pointer-events:none}
+.pp-shake{animation:ppShake .5s cubic-bezier(.36,.07,.19,.97)}
+@keyframes ppShake{10%,90%{transform:translate3d(-1px,1px,0)}20%,80%{transform:translate3d(3px,-2px,0)}30%,50%,70%{transform:translate3d(-5px,2px,0)}40%,60%{transform:translate3d(5px,-1px,0)}}
+@keyframes fxTp{0%,30%{box-shadow:0 0 0 2px #ffd447,0 0 50px 8px rgba(255,201,64,.85),0 0 90px 10px rgba(0,245,160,.35);background:rgba(255,201,64,.24)}55%{box-shadow:0 0 0 2px #00f5a0,0 0 40px 4px rgba(0,245,160,.6)}100%{}}
 
 @media (prefers-reduced-motion: reduce){
   body::before,.prow.gain,.prow.loss,.bchip .light,.mbadge.live i,.fn.live i,.tw{animation:none!important}
   .fx-buy,.fx-tp,.fx-stop,.fx-sell{animation-duration:.01s!important}
   .fx-buy{outline:2px solid var(--green)}.fx-tp{outline:2px solid var(--gold)}.fx-stop{outline:2px solid var(--red)}.fx-sell{outline:2px solid var(--blue)}
-  .ppban{animation:none;transition:none}.confetti{display:none}
+  .ppban{animation:none;transition:none}.arcade{display:none}.pp-shake{animation:none!important}
 }
 #a2hs{background:linear-gradient(90deg,#00b37a,#0096c7);border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,194,255,.3)}
