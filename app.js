@@ -98,9 +98,10 @@
     const el = $("#offline"); const showErr = S.err && S.err !== "nodata" ? true : S.err === "nodata" && S.state;
     if (!showErr || !S.dp) { el.hidden = true; return; }
     const n = Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000));
-    el.hidden = false; el.textContent = `Desk offline · retrying in ${n}s · last update ${S.lastIxT ? hm(S.lastIxT) : "never"}`;
+    el.hidden = false; el.textContent = `Desk on standby · checking again in ${n}s · last update ${S.lastIxT ? hm(S.lastIxT) : "never"}`;
   }
-  setInterval(() => { offlineRow(); liveLabel(); }, 1000);
+  function badgeTick() { const b = $("#mbadge"); if (b) { const h = modeBadge(); if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; } } }
+  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); }, 1000);
 
   // ---------- views ----------
   function viewGate(kind) {
@@ -120,8 +121,10 @@
   }
 
   // ---------- Pump Pilot: home ----------
-  const LOGO = '<svg viewBox="0 0 32 32" class="pplogo" aria-hidden="true"><defs><linearGradient id="ppg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00f5a0"/><stop offset="1" stop-color="#00c2ff"/></linearGradient></defs><rect x="1" y="1" width="30" height="30" rx="9" fill="#0b1411" stroke="url(#ppg)" stroke-width="1.5"/><g transform="rotate(45 16 16)"><path d="M13.6 21.6h4.8L16 26.6z" fill="#00c2ff" opacity=".9"/><path d="M12.2 17.2L8.8 21v1.6l3.4-1.2zM19.8 17.2l3.4 3.8v1.6l-3.4-1.2z" fill="url(#ppg)"/><path d="M16 5.4c3 2.4 4.1 6 4.1 9.8v6.4h-8.2v-6.4c0-3.8 1.1-7.4 4.1-9.8z" fill="url(#ppg)"/><circle cx="16" cy="13.4" r="1.9" fill="#0b1411" stroke="#d9fff3" stroke-width=".6"/></g></svg>';
-  const modeBadge = () => { const m = S.state && S.state.mode; return m === "LIVE" ? '<span class="mbadge live"><i></i>LIVE</span>' : m === "PAPER" ? '<span class="mbadge paper">PAPER</span>' : ""; };
+  const LOGO = '<img src="rocket-logo.png" class="pplogo" alt="">';
+  // desk up = fresh data from the last poll; otherwise the badge says STANDBY (never "offline")
+  const deskUp = () => !!S.state && !S.err;
+  const modeBadge = () => { const m = S.state && S.state.mode; if (S.state && !deskUp()) return '<span class="mbadge standby"><i></i>STANDBY</span>'; return m === "LIVE" ? '<span class="mbadge live"><i></i>LIVE</span>' : m === "PAPER" ? '<span class="mbadge paper">PAPER</span>' : ""; };
   const LIGHT = { running: ["ok", "OK"], paused: ["paused", "Paused"], stale: ["stale", "Stale"], off: ["off", "Off"] };
   function botStrip() {
     return `<div class="botstrip">${BOT_ORDER.map((n) => { const b = bots()[n] || { name: n, title: n, status: "off" };
@@ -129,6 +132,7 @@
       const sub = b.status === "stale" && b.age_s != null ? Math.round(b.age_s / 60) + "m" : lab;
       return `<button class="bchip ${cls}" data-act="tab" data-tab="bots" title="${esc(b.title || n)} · ${esc(b.status || "off")}"><i class="light"></i><span class="bn">${esc(b.title || n[0].toUpperCase() + n.slice(1))}</span><span class="bs">${esc(sub)}</span></button>`; }).join("")}</div>`;
   }
+  const isTrail = (r) => /trail/i.test((r.subtitle || "") + " " + (r.reason || ""));
   const isTP = (r) => r.kind === "sold" && /take ?profit|\btp\b/i.test((r.subtitle || "") + " " + (r.reason || ""));
   const tradeTag = (r) => r.kind === "bought" ? '<span class="tag buy">BUY</span>' : r.kind === "stopped" ? '<span class="tag stop">STOP</span>'
     : isTP(r) ? '<span class="tag tp">TAKE PROFIT</span>' : /trail/i.test(r.subtitle || "") ? '<span class="tag sell">TRAIL</span>' : '<span class="tag sell">SELL</span>';
@@ -167,7 +171,7 @@
     return `
       <header class="pphead">
         <div class="brand">${LOGO}<div><div class="bname">Pump <span>Pilot</span></div><div class="btag">FOMO desk · ${running}/5 bots online</div></div></div>
-        <div class="navsp"></div>${modeBadge()}
+        <div class="navsp"></div><span id="mbadge">${modeBadge()}</span>
         <button class="iconbtn" data-act="search" aria-label="Search">${ICON.search}</button>
         <button class="iconbtn" data-act="tab" data-tab="activity" aria-label="Activity">${ICON.bell}${unseen ? '<i class="dot"></i>' : ""}</button>
       </header>
@@ -232,7 +236,7 @@
   }
 
   // ---------- Pump Pilot: trade effects, from diffing activity rows + positions between polls ----------
-  // buy -> green rocket launch + green glow; take-profit (or tp_done 0->1) -> rocket detonates into a firework + gold/green flash; stop -> red rocket stalls, tumbles, crashes + red flash + shake; sell -> blue rocket landing
+  // buy -> rocket launch + blue glow; take-profit (or tp_done 0->1) -> rocket detonates into a teal firework + teal edge glow; stop -> rocket stalls, tumbles, crashes + red sparks/edge glow + shake; sell -> rocket landing + blue puff
   const FX = { seen: null, pos: null, queue: [] };
   function fxDiff(state, act) {
     const rows = (act && act.rows) || [], pos = Object.fromEntries(((state && state.positions) || []).map((p) => [p.mint, p]));
@@ -241,7 +245,7 @@
     const out = [], hit = new Set();
     for (const r of rows.slice().reverse()) {
       if (FX.seen.has(r.id)) continue; FX.seen.add(r.id);
-      const kind = r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : "sell") : null;
+      const kind = r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : isTrail(r) ? "land" : "sell") : null;
       if (kind) { out.push({ kind, mint: r.mint, aid: r.id }); hit.add(kind + r.mint); }
     }
     for (const [m, p] of Object.entries(pos)) {
@@ -259,7 +263,7 @@
       const targets = [...document.querySelectorAll(`.prow[data-mint="${CSS.escape(e.mint || "")}"]`), ...document.querySelectorAll(`.trow[data-aid="${CSS.escape(String(e.aid ?? "-"))}"]`)];
       const hero = $("#hero"); const all = targets.length ? targets : hero ? [hero] : [];
       if (e.kind !== "buy" && hero && !all.includes(hero)) all.push(hero);
-      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + e.kind); setTimeout(() => el.classList.remove("fx-" + e.kind), 2400); });
+      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell", "fx-land"); void el.offsetWidth; el.classList.add("fx-" + e.kind); setTimeout(() => el.classList.remove("fx-" + e.kind), 2400); });
       banner(e);
       const vis = all.find((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
       if (!calm) {
@@ -270,7 +274,7 @@
     }, i * 700));
   }
   function banner(e) {
-    const t = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Sold" }[e.kind];
+    const t = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Sold", land: "Trail exit" }[e.kind];
     const p = (S.state.positions || []).find((x) => x.mint === e.mint);
     const r = ((S.files["activity/0"] || {}).rows || []).find((x) => x.id === e.aid || (e.aid == null && x.mint === e.mint));
     const s = (p && p.symbol) || (r && (r.title || "").split(" ").slice(1).join(" ")) || (e.mint || "").slice(0, 4);
@@ -278,58 +282,23 @@
     el.innerHTML = `<b>${esc(t)}</b> ${esc(s)}${r && r.value ? ` <span>${esc(String(r.value).split(" · ")[0])}</span>` : ""}`;
     document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 2600); setTimeout(() => el.remove(), 3200);
   }
-  // ---------- Pump Pilot rocket (hand-written SVG, accent colour is a parameter; master copy = web/rocket.svg) ----------
-  const ppShade = (hex, f) => { const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f));
-    return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join(""); };
-  function rocketSVG(acc, parts = "all") {
-    const L = ppShade(acc, 0.45), D = ppShade(acc, -0.45), DD = ppShade(acc, -0.7), id = "r" + acc.slice(1) + parts;
-    const body = parts !== "flame", flame = parts !== "body";
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 220" width="100" height="220">
-<defs>
-<linearGradient id="${id}m" x1="0" x2="1"><stop offset="0" stop-color="#4a525f"/><stop offset=".18" stop-color="#9aa4b3"/><stop offset=".38" stop-color="#ffffff"/><stop offset=".55" stop-color="#d5dce6"/><stop offset=".8" stop-color="#7d8796"/><stop offset="1" stop-color="#3a414c"/></linearGradient>
-<linearGradient id="${id}a" x1="0" x2="1"><stop offset="0" stop-color="${DD}"/><stop offset=".3" stop-color="${acc}"/><stop offset=".42" stop-color="${L}"/><stop offset=".62" stop-color="${acc}"/><stop offset="1" stop-color="${DD}"/></linearGradient>
-<linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${L}"/><stop offset=".55" stop-color="${acc}"/><stop offset="1" stop-color="${D}"/></linearGradient>
-<linearGradient id="${id}n" x1="0" x2="1"><stop offset="0" stop-color="#1b1f26"/><stop offset=".4" stop-color="#6c7482"/><stop offset=".6" stop-color="#3b414b"/><stop offset="1" stop-color="#121418"/></linearGradient>
-<radialGradient id="${id}g" cx=".38" cy=".35" r=".75"><stop offset="0" stop-color="${L}"/><stop offset=".45" stop-color="${D}"/><stop offset="1" stop-color="#05080c"/></radialGradient>
-<linearGradient id="${id}x" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe6"/><stop offset=".25" stop-color="#ffd447"/><stop offset=".6" stop-color="#ff7a1a"/><stop offset="1" stop-color="#ff3d00" stop-opacity="0"/></linearGradient>
-<linearGradient id="${id}y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#fff1a8"/><stop offset="1" stop-color="#ffd447" stop-opacity="0"/></linearGradient>
-</defs>
-${flame ? `<g><path d="M31 164 C 27 186, 40 204, 50 219 C 60 204, 73 186, 69 164 Z" fill="url(#${id}x)" opacity=".95"/>
-<path d="M39 164 C 37 180, 45 192, 50 203 C 55 192, 63 180, 61 164 Z" fill="url(#${id}y)"/>
-<ellipse cx="50" cy="166" rx="15" ry="3.5" fill="#fff7d0" opacity=".9"/></g>` : ""}
-${body ? `<g>
-<path d="M30 104 C 14 116, 7 136, 6 162 C 13 156, 21 151, 30 148 Z" fill="url(#${id}f)" stroke="${DD}" stroke-width="1"/>
-<path d="M70 104 C 86 116, 93 136, 94 162 C 87 156, 79 151, 70 148 Z" fill="url(#${id}f)" stroke="${DD}" stroke-width="1"/>
-<path d="M36 148 L64 148 L70 166 L30 166 Z" fill="url(#${id}n)" stroke="#0b0d10" stroke-width=".8"/>
-<path d="M31 166 L69 166 L68 162 L32 162 Z" fill="#ff9a3c" opacity=".55"/>
-<path d="M50 3 C 71 27, 76 66, 74 110 L 71 149 L 29 149 L 26 110 C 24 66, 29 27, 50 3 Z" fill="url(#${id}m)" stroke="#2a3038" stroke-width="1"/>
-<path d="M50 3 C 64 19, 70 35, 72 50 L 28 50 C 30 35, 36 19, 50 3 Z" fill="url(#${id}a)"/>
-<path d="M28 50 L72 50" stroke="#1e232a" stroke-width="1.6"/><path d="M28.4 52 L71.6 52" stroke="#ffffff" stroke-opacity=".35" stroke-width=".8"/>
-<rect x="26" y="116" width="48" height="9" fill="url(#${id}a)"/><path d="M26 116 H74 M26 125 H74" stroke="#1e232a" stroke-width="1"/>
-<path d="M27 136 H73" stroke="#1e232a" stroke-opacity=".6" stroke-width=".8"/>
-<circle cx="50" cy="80" r="13" fill="url(#${id}m)" stroke="#262b33" stroke-width="1.2"/>
-<circle cx="50" cy="80" r="9.2" fill="url(#${id}g)" stroke="#0b0e12" stroke-width="1"/>
-<ellipse cx="46.5" cy="76.5" rx="3.6" ry="2.2" fill="#fff" opacity=".75" transform="rotate(-30 46.5 76.5)"/>
-${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a * Math.PI) / 180)).toFixed(2)}" cy="${(80 + 11.2 * Math.sin((a * Math.PI) / 180)).toFixed(2)}" r=".9" fill="#2a3038"/>`).join("")}
-<path d="M44 22 C 36 40, 33 72, 34 140" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-<path d="M48 128 L52 128 L53.5 158 L46.5 158 Z" fill="url(#${id}f)" stroke="${DD}" stroke-width=".8"/>
-</g>` : ""}
-</svg>`;
-  }
   // ---------- Pump Pilot arcade effects: one canvas overlay per effect, rAF, removed after ~2 s (fire-and-forget) ----------
   // The rocket is the SVG above, pre-rendered once per colour into an offscreen bitmap (cached), so a frame is one drawImage.
-  // buy = green launch; tp = green launch + green/gold firework + shockwave; stop = red stall, tumble, crash + shake; sell = blue landing + puff
-  const RKT = {}, RC = { buy: "#22e584", tp: "#22e584", stop: "#ff4d6d", sell: "#4da3ff" };
-  function rocketSprite(acc) {
-    const o = RKT[acc]; if (o) return o.ready ? o : null;
-    const n = (RKT[acc] = { ready: false });
-    const mk = (parts) => new Promise((res) => { const im = new Image();
-      im.onload = () => { const c = document.createElement("canvas"); c.width = 200; c.height = 440; c.getContext("2d").drawImage(im, 0, 0, 200, 440); res(c); };
-      im.onerror = () => res(null); im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(rocketSVG(acc, parts)); });
-    Promise.all([mk("body"), mk("flame")]).then(([b, f]) => { if (b && f) Object.assign(n, { body: b, flame: f, ready: true }); else delete RKT[acc]; });
+  // buy = GREEN rocket launch; tp = original teal rocket + teal firework; stop = red rocket stalls, tumbles, red fire explosion + shake;
+  // sell = RED rocket landing; land (trailing-stop exit) = BLUE rocket landing. Teal edge glow on TP, no gold anywhere.
+  // Tinted rockets are pre-rendered PNGs (only the saturated tip/fins/flame recoloured, silver body untouched): no CSS/canvas filters.
+  const RKT = {}, RC = { buy: "#00e676", tp: "#19e6c1", stop: "#ff4d6d", sell: "#ff3b4f", land: "#2f7bff" }, RC2 = { buy: "#69f0ae", tp: "#00f5a0", stop: "#ff8a8a", sell: "#ff8a8a", land: "#00c2ff" };
+  const RIMG = { buy: "rocket-green.png", tp: "rocket-real.png", stop: "rocket-red.png", sell: "rocket-red.png", land: "rocket-blue.png" };
+  const RGLOW = { buy: "105,240,174", tp: "120,220,255", stop: "255,120,120", sell: "255,110,120", land: "90,150,255" };
+  function rocketSprite(kind = "tp") {
+    const f = RIMG[kind] || RIMG.tp, o = RKT[f]; if (o) return o.ready ? o : null;
+    const n = (RKT[f] = { ready: false }); const im = new Image();
+    im.onload = () => { const c = document.createElement("canvas"); c.width = 384; c.height = 384; c.getContext("2d").drawImage(im, 0, 0, 384, 384); Object.assign(n, { bmp: c, ready: true }); };
+    im.onerror = () => { delete RKT[f]; }; im.src = f;
     return null;
   }
-  setTimeout(() => { if (!reduce()) Object.values(RC).forEach(rocketSprite); }, 1200);   // warm the 3 bitmaps after the first paint
+  const warmRockets = () => Object.keys(RIMG).map(rocketSprite).every(Boolean);
+  setTimeout(() => { if (!reduce()) warmRockets(); }, 1200);   // warm the bitmap after the first paint
   let arcadeLive = 0;
   function arcade(kind, anchor, onImpact) {
     if (arcadeLive >= 3 || document.hidden) return;
@@ -337,7 +306,7 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     const cv = document.createElement("canvas"); cv.className = "arcade"; cv.width = W * dpr; cv.height = H * dpr;
     document.body.appendChild(cv); arcadeLive++;
     const g = cv.getContext("2d"); g.scale(dpr, dpr);
-    const spr = rocketSprite(RC[kind]), SZ = W < 600 ? 34 : 42, RH = SZ * 2.2;
+    const spr = rocketSprite(kind), IMG = W < 600 ? 120 : 150, SZ = IMG * 0.32, RH = IMG * 0.8;   // IMG = drawn image size; the rocket is ~a third of it wide
     const r = anchor ? anchor.getBoundingClientRect() : { left: W / 2 - 50, top: H / 2, width: 100, height: 40 };
     const clampX = (x) => Math.min(W - 40, Math.max(40, x)), clampY = (y) => Math.min(H - 30, Math.max(30, y));
     const ax = clampX(r.left + r.width * (kind === "tp" ? 0.5 : 0.82)), ay = clampY(r.top + r.height / 2);
@@ -353,17 +322,16 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     if (kind === "buy") { R.y = clampY(ay + 6); R.vy = -70; }
     if (kind === "tp") { R.y0 = Math.min(H - 20, r.top + r.height - 30); R.y = R.y0; R.yA = Math.max(70, r.top + 50); }
     if (kind === "stop") { R.y0 = ay; }
-    if (kind === "sell") { R.y = -RH; R.land = clampY(r.top - 4) - RH * 0.3; }
-    const exhaust = () => ({ x: R.x - Math.sin(R.a) * RH * 0.32, y: R.y + Math.cos(R.a) * RH * 0.32 });
+    if (kind === "sell" || kind === "land") { R.y = -RH; R.land = clampY(r.top - 4) - RH * 0.3; }
+    const exhaust = () => ({ x: R.x - Math.sin(R.a) * IMG * 0.27, y: R.y + Math.cos(R.a) * IMG * 0.27 });
+    const TILT = -0.5, PX = 0.547, PY = 0.41;   // the photo points ~29 deg right of up; pivot = body centre in the image
     function drawRocket() {
       if (!spr || !R.on) return;
       g.save(); g.globalAlpha = R.alpha; g.translate(R.x, R.y); g.rotate(R.a);
-      const top = -RH * (100 / 220);
-      if (R.fl > 0.02) { const ny = top + RH * (164 / 220);
-        const gl = g.createRadialGradient(0, ny + 8, 0, 0, ny + 8, SZ * 1.1 * R.fl); gl.addColorStop(0, "rgba(255,200,80,.55)"); gl.addColorStop(1, "rgba(255,120,0,0)");
-        g.fillStyle = gl; g.beginPath(); g.arc(0, ny + 8, SZ * 1.1 * R.fl, 0, Math.PI * 2); g.fill();
-        g.save(); g.translate(0, ny); g.scale(rnd(0.86, 1.08), R.fl * rnd(0.82, 1.22)); g.drawImage(spr.flame, -SZ / 2, -RH * (164 / 220), SZ, RH); g.restore(); }
-      g.drawImage(spr.body, -SZ / 2, top, SZ, RH);
+      if (R.fl > 0.02) { const ny = IMG * 0.27, rr = SZ * 1.3 * R.fl * rnd(0.85, 1.15);   // engine glow flicker at the nozzle
+        const gl = g.createRadialGradient(0, ny, 0, 0, ny, rr); gl.addColorStop(0, `rgba(${RGLOW[kind]},.6)`); gl.addColorStop(1, `rgba(${RGLOW[kind]},0)`);
+        g.fillStyle = gl; g.beginPath(); g.arc(0, ny, rr, 0, Math.PI * 2); g.fill(); }
+      g.rotate(TILT); g.drawImage(spr.bmp, -IMG * PX, -IMG * PY, IMG, IMG);
       g.restore();
     }
     const t0 = performance.now(); let last = t0;
@@ -376,34 +344,34 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
       // ---- choreography ----
       if (kind === "buy" && R.on) { R.vy -= 1000 * dt; R.y += R.vy * dt; R.a = Math.sin(t * 11) * 0.035; R.fl = rnd(0.85, 1.15); if (R.y < -RH) R.on = false; }
       if (kind === "tp" && R.on) { const k = Math.min(1, t / 0.6); R.y = R.y0 + (R.yA - R.y0) * k * k; R.a = Math.sin(t * 13) * 0.03; R.fl = rnd(0.9, 1.25);
-        if (k >= 1) { R.on = false; flash = { t, c: "255,232,150", a: 0.38, d: 0.35 };
-          burst(R.x, R.y, 130, 540, ["#22e584", "#ffd447", "#ffb800", "#8dffc4", "#fff3b0"], 1.3);
-          for (let i = 0; i < 10; i++) { const a = rnd(0, Math.PI * 2), v = rnd(80, 260); add({ x: R.x, y: R.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 0.95, g: 40, life: rnd(0.8, 1.2), s: rnd(5, 9), c: i % 2 ? "#ffffff" : "#ffd447", glow: 12, star: true }); }
-          rings.push({ x: R.x, y: R.y, t0: t, c: "255,212,71", R: 180 }, { x: R.x, y: R.y, t0: t + 0.1, c: "34,229,132", R: 130 });
+        if (k >= 1) { R.on = false; flash = { t, c: "25,230,193", a: 0.55, d: 0.6 };
+          burst(R.x, R.y, 130, 540, ["#19e6c1", "#00f5a0", "#7dffe3", "#ffffff", "#00c2ff"], 1.3);
+          for (let i = 0; i < 10; i++) { const a = rnd(0, Math.PI * 2), v = rnd(80, 260); add({ x: R.x, y: R.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 0.95, g: 40, life: rnd(0.8, 1.2), s: rnd(5, 9), c: i % 2 ? "#ffffff" : "#7dffe3", glow: 12, star: true }); }
+          rings.push({ x: R.x, y: R.y, t0: t, c: "25,230,193", R: 180 }, { x: R.x, y: R.y, t0: t + 0.1, c: "0,245,160", R: 130 });
           const bx = R.x, by = R.y;
-          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#22e584", "#ffd447"], 0.9); rings.push({ x, y, t0: tt, c: "34,229,132", R: 70 }); }, 240);
-          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#ffd447", "#fff3b0"], 0.9); rings.push({ x, y, t0: tt, c: "255,212,71", R: 70 }); }, 430); } }
+          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#00f5a0", "#19e6c1"], 0.9); rings.push({ x, y, t0: tt, c: "0,245,160", R: 70 }); }, 240);
+          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#19e6c1", "#ffffff"], 0.9); rings.push({ x, y, t0: tt, c: "25,230,193", R: 70 }); }, 430); } }
       if (kind === "stop" && R.on) {
         if (t < 0.5) { R.y = R.y0 - 46 * Math.sin((t / 0.5) * Math.PI / 2); R.a = Math.sin(t * 30) * 0.06 * (t / 0.5); R.fl = Math.random() < 0.3 ? 0 : rnd(0.2, 0.7); }   // stall: sputtering engine
         else { if (!R.tumble) { R.tumble = 1; R.vy = -40; R.vx = R.x > W / 2 ? -70 : 70; R.spin = R.vx > 0 ? 7 : -7; R.fl = 0; puff(R.x, R.y + 10, 4, "90,90,100", 40); }
           R.vy += 1050 * dt; R.y += R.vy * dt; R.x += R.vx * dt; R.a += R.spin * dt; R.fl = 0;
           const ground = Math.min(H - 30, R.y0 + 300);
-          if (R.y > ground || t > 1.35) { R.on = false; flash = { t, c: "255,40,70", a: 0.22, d: 0.3 };
+          if (R.y > ground || t > 1.35) { R.on = false; flash = { t, c: "255,40,70", a: 0.4, d: 0.45 };
             burst(R.x, R.y, 70, 380, ["#ff4d6d", "#ff8a3a", "#ffd0d0", "#ff2244"], 0.9, 260); puff(R.x, R.y, 12, "60,58,66", 120, 1.4);
             rings.push({ x: R.x, y: R.y, t0: t, c: "255,77,109", R: 90 }); if (onImpact) onImpact(); } } }
-      if (kind === "sell" && R.on) { const k = Math.min(1, t / 1.05), e = 1 - Math.pow(1 - k, 3); R.y = -RH + (R.land + RH) * e; R.a = Math.sin(t * 7) * 0.03 * (1 - k);
+      if ((kind === "sell" || kind === "land") && R.on) { const k = Math.min(1, t / 1.05), e = 1 - Math.pow(1 - k, 3); R.y = -RH + (R.land + RH) * e; R.a = Math.sin(t * 7) * 0.03 * (1 - k);
         R.fl = k < 1 ? rnd(0.55, 0.95) * (0.6 + 0.4 * (1 - e)) : Math.max(0, R.fl - dt * 6);
-        if (k >= 1 && !R.down) { R.down = t; const ex = exhaust(); puff(ex.x, ex.y, 12, "190,225,255", 110, 0.8); burst(ex.x, ex.y, 22, 170, ["#4da3ff", "#cfe6ff"], 0.6, 120); rings.push({ x: ex.x, y: ex.y, t0: t, c: "77,163,255", R: 60, flat: 1 }); }
+        if (k >= 1 && !R.down) { R.down = t; const ex = exhaust(); const red = kind === "sell"; puff(ex.x, ex.y, 12, red ? "255,200,205" : "190,225,255", 110, 0.8); burst(ex.x, ex.y, 22, 170, red ? ["#ff3b4f", "#ffc2c8"] : ["#4da3ff", "#cfe6ff"], 0.6, 120); rings.push({ x: ex.x, y: ex.y, t0: t, c: red ? "255,59,79" : "77,163,255", R: 60, flat: 1 }); }
         if (R.down && t > 1.45) R.alpha = Math.max(0, 1 - (t - 1.45) / 0.4); }
       // ---- exhaust particles ----
       if (R.on && R.fl > 0.05) { const ex = exhaust(); const n = kind === "stop" ? 1 : 2;
         for (let i = 0; i < n; i++) {
-          if (kind !== "sell" && (kind !== "tp" || i === 0)) add({ x: ex.x + rnd(-3, 3), y: ex.y + rnd(-2, 2), vx: rnd(-22, 22) - Math.sin(R.a) * 60, vy: rnd(30, 70) * Math.cos(R.a), drag: 0.95, life: rnd(0.45, kind === "tp" ? 0.6 : 0.85), s: rnd(3.5, 7), grow: 18, c: "190,198,214", smoke: true });
-          add({ x: ex.x, y: ex.y, vx: rnd(-70, 70), vy: rnd(60, 180) * (kind === "sell" ? 0.5 : 1), g: 220, life: rnd(0.2, kind === "sell" ? 0.3 : 0.5), s: rnd(1.1, 2.2), c: i ? "#ffd447" : RC[kind], glow: 8 }); } }
+          if (kind !== "sell" && kind !== "land" && (kind !== "tp" || i === 0)) add({ x: ex.x + rnd(-3, 3), y: ex.y + rnd(-2, 2), vx: rnd(-22, 22) - Math.sin(R.a) * 60, vy: rnd(30, 70) * Math.cos(R.a), drag: 0.95, life: rnd(0.45, kind === "tp" ? 0.6 : 0.85), s: rnd(3.5, 7), grow: 18, c: "190,198,214", smoke: true });
+          add({ x: ex.x, y: ex.y, vx: rnd(-70, 70), vy: rnd(60, 180) * (kind === "sell" || kind === "land" ? 0.5 : 1), g: 220, life: rnd(0.2, kind === "sell" || kind === "land" ? 0.3 : 0.5), s: rnd(1.1, 2.2), c: i ? RC2[kind] : RC[kind], glow: 8 }); } }
       if (kind === "stop" && R.on && R.tumble) { add({ x: R.x + rnd(-4, 4), y: R.y + rnd(-4, 4), vx: rnd(-20, 20), vy: rnd(-30, 0), drag: 0.95, life: rnd(0.6, 1), s: rnd(5, 9), grow: 24, c: "55,52,60", smoke: true });
         add({ x: R.x, y: R.y, vx: rnd(-150, 150), vy: rnd(-170, 30), g: 420, life: rnd(0.3, 0.6), s: rnd(1.3, 2.4), c: Math.random() < 0.5 ? "#ff4d6d" : "#ffb03a", glow: 8 }); }
       if (R.on && (R.st = (R.st || 0) + dt) > 0.11) { R.st = 0; const a = rnd(0, Math.PI * 2), d = rnd(SZ * 0.8, SZ * 1.7);
-        add({ x: R.x + Math.cos(a) * d, y: R.y + Math.sin(a) * d * 1.2, vx: rnd(-8, 8), vy: kind === "buy" || kind === "tp" ? rnd(20, 50) : rnd(-10, 10), life: rnd(0.45, 0.75), s: rnd(3, 6), c: kind === "stop" ? "#ffb3c0" : kind === "sell" ? "#d6ecff" : Math.random() < 0.6 ? "#ffffff" : "#fff1a8", glow: 8, star: true }); }
+        add({ x: R.x + Math.cos(a) * d, y: R.y + Math.sin(a) * d * 1.2, vx: rnd(-8, 8), vy: kind === "buy" || kind === "tp" ? rnd(20, 50) : rnd(-10, 10), life: rnd(0.45, 0.75), s: rnd(3, 6), c: Math.random() < 0.6 ? "#ffffff" : { stop: "#ffb3c0", tp: "#7dffe3", buy: "#b9f6ca", sell: "#ffb3bb", land: "#9fdcff" }[kind], glow: 8, star: true }); }
       // ---- draw: smoke under, rocket, sparks/rings over ----
       for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.age += dt; if (p.age > p.life) { P.splice(i, 1); continue; }
         p.vx *= p.drag; p.vy = p.vy * p.drag + p.g * dt; p.ox = p.x; p.oy = p.y; p.x += p.vx * dt; p.y += p.vy * dt;
@@ -420,7 +388,9 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
       for (const rg of rings) { const k = (t - rg.t0) / 0.7; if (k < 0 || k > 1) continue; const rr = rg.R * (1 - Math.pow(1 - k, 3));
         g.strokeStyle = `rgba(${rg.c},${1 - k})`; g.lineWidth = 6 * (1 - k) + 1; g.beginPath();
         if (rg.flat) g.ellipse(rg.x, rg.y, rr, rr * 0.28, 0, 0, Math.PI * 2); else g.arc(rg.x, rg.y, rr, 0, Math.PI * 2); g.stroke(); }
-      if (flash && t - flash.t < flash.d) { g.fillStyle = `rgba(${flash.c},${flash.a * (1 - (t - flash.t) / flash.d)})`; g.fillRect(0, 0, W, H); }
+      if (flash && t - flash.t < flash.d) { const k = 1 - (t - flash.t) / flash.d, m = Math.max(W, H);   // soft edge glow, centre stays clear
+        const eg = g.createRadialGradient(W / 2, H / 2, m * 0.32, W / 2, H / 2, m * 0.75); eg.addColorStop(0, `rgba(${flash.c},0)`); eg.addColorStop(1, `rgba(${flash.c},${flash.a * k})`);
+        g.fillStyle = eg; g.fillRect(0, 0, W, H); }
       if (t < D / 1000) requestAnimationFrame(frame); else { clearTimeout(hard); kill(); }
     };
     requestAnimationFrame(frame);
@@ -469,7 +439,7 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     return `<div class="card bot" ${full ? "" : `data-act="tab" data-tab="bots"`}><div class="head">${st}<span style="color:${esc(b.color || "#fff")}">${esc(b.title || b.name)}</span><span class="ter" style="margin-left:auto;font-weight:400;font-size:13px">${esc(b.status || "off")}</span></div>${body}</div>`;
   }
   function actRow(r) {
-    const k = r.kind, col = k === "bought" ? "#00f5a0" : k === "sold" ? (isTP(r) ? "#ffc940" : "#00c2ff") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
+    const k = r.kind, col = k === "bought" ? "#00f5a0" : k === "sold" ? (isTP(r) ? "#19e6c1" : "#00c2ff") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
     const rv = k === "rejected" ? `<span class="mut">Skipped</span>` : esc(r.value || "");
     const act = k === "rejected" ? "audit" : "coin";
     return `<div class="row" data-act="${act}" data-mint="${esc(r.mint)}"><div class="ic" style="color:${col}">${esc((r.title || "?").split(" ").pop().slice(0, 1))}</div>
@@ -552,14 +522,16 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
         <input type="range" min="${esc(r.min)}" max="${esc(r.max)}" step="${r.type === "int" ? 1 : "any"}" value="${esc(v)}" disabled></div>`;
     };
     return `<h1 class="title">Account</h1>
-      <div class="seg"><span class="${ac.mode === "PAPER" ? "on" : ""}">PAPER</span><span class="${ac.mode === "LIVE" ? "on" : ""}">LIVE</span></div>
-      ${roNote("Switch with 'paper' / 'live' (LIVE needs you to type LIVE)")}
+      <div class="modeseg" role="radiogroup" aria-label="Trading mode">
+        <button role="radio" aria-checked="${ac.mode === "PAPER"}" class="${ac.mode === "PAPER" ? "on paper" : ""}" data-act="mode" data-m="PAPER">🧪 PAPER</button>
+        <button role="radio" aria-checked="${ac.mode === "LIVE"}" class="${ac.mode === "LIVE" ? "on live" : ""}" data-act="mode" data-m="LIVE">🟢 LIVE</button></div>
+      <div class="ro">Mode from the desk: <b>${esc(ac.mode)}</b>. ${ac.mode === "LIVE" ? "Real money." : "No real money."}</div>
       <div class="grp">Cash</div><div class="list plain"><div class="row"><div class="tx"><div class="t1">${money(ac.cash)}</div><div class="t2">${ac.mode === "PAPER" ? `PAPER start cash ${money(ac.paper_start_cash)}` : "from FOMO /balances"}</div></div></div></div>
       <div class="grp">FOMO</div><div class="list plain">
         ${fomoLink(ac.profile_url) ? `<a class="row" href="${esc(ac.profile_url)}" target="_blank" rel="noopener noreferrer"><div class="tx"><div class="t1">Your FOMO profile</div><div class="t2">@${esc(ac.fomo_handle)}</div></div><span class="ter">›</span></a>` : ""}
         ${fomoLink(ac.invite_url) ? `<button class="row" data-act="invite" style="width:100%;text-align:left"><div class="tx"><div class="t1">Invite a friend</div><div class="t2">Share your FOMO invite link</div></div><span class="ter">›</span></button>` : ""}
       </div>
-      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop and trail on Home · no trade</div></div><span class="ter">›</span></button></div>
+      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop, sell and trail exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
       <div class="grp">Pushes</div><div class="list plain">
         <div class="row"><div class="tx"><div class="t1">Telegram</div><div class="t2">${ac.pushes && ac.pushes.telegram ? "connected" : "not connected yet (STEP 11)"}</div></div></div>
@@ -651,6 +623,7 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     else if (act === "invite") invite();
     else if (act === "closesheet") $("#sheet").hidden = true;
     else if (act === "fxdemo") fxDemo();
+    else if (act === "mode") openMode(t.dataset.m);
   });
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 1800); }
   async function invite() {
@@ -668,6 +641,36 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
       $("#qres").innerHTML = !s ? "" : hit.length ? `<div class="list" style="margin-bottom:12px">${hit.map((r) => `<div class="row" data-act="coin" data-mint="${esc(r.mint)}"><div class="ic">${sym(r.symbol, r.mint).slice(0, 1)}</div><div class="tx"><div class="t1">${esc(r.name || r.symbol)}</div><div class="t2">${sym(r.symbol, r.mint)} · ${esc(r.mint.slice(0, 6))}…</div></div><div class="rv">${fomoA(r.link)}</div></div>`).join("")}</div>`
         : `<div class="empty" style="margin-bottom:12px">No coin the desk saw tonight matches "${esc(q.value)}"</div>`;
     });
+  }
+  // ---------- PAPER / LIVE switch sheet ----------
+  // Plan B hosting: the phone can't reach the desk (no public port), so this sheet sends nothing; it says so plainly.
+  const MODE_SEND = null;      // set to a real sender once the desk has an approved, authenticated mode endpoint
+  function setv(key) { const g = (S.files.settings || {}).groups || {}; for (const rows of Object.values(g)) for (const r of rows) if (r.key === key) return r.value; return null; }
+  function openMode(to) {
+    const cur = (S.files.account && S.files.account.mode) || (S.state && S.state.mode); if (!to || to === cur) return;
+    const sh = $("#sheet"), live = to === "LIVE";
+    const rp = setv("brain.risk_per_trade_pct"), mn = setv("brain.min_ticket_usd"), mx = setv("brain.max_ticket_usd"), nl = setv("risk.night_loss_stop_pct"), sp = setv("risk.stop_pct");
+    const nsb = S.state && S.state.night_start_balance;
+    sh.innerHTML = `<div class="in"><div class="grab"></div><div style="font:700 20px var(--disp);margin-bottom:6px">${live ? "🟢 Switch to LIVE" : "🧪 Switch to PAPER"}</div>
+      ${live ? `<div class="mrows">
+          <div><span>Per buy</span><b>${rp != null ? esc(rp) + "% of cash" : "–"}${mn != null && mx != null ? ` · ${money(+mn)}–${money(+mx)}` : ""}</b></div>
+          <div><span>Stop per trade</span><b>${sp != null ? "-" + esc(sp) + "%" : "–"}</b></div>
+          <div><span>Nightly loss cap</span><b>${nl != null ? "buys stop at -" + esc(nl) + "%" : "–"}${nl != null && nsb ? ` (≈ ${money(nsb * (1 - nl / 100))})` : ""}</b></div>
+          <div><span>First live buy</span><b>60 s after the switch</b></div></div>
+        <div class="ro" style="margin:10px 0 6px">LIVE trades real money. The desk refuses unless you unlocked LIVE on the server yourself.</div>
+        <input id="livein" class="livein" placeholder="Type LIVE" autocomplete="off" autocapitalize="characters" spellcheck="false">`
+      : `<div class="ro" style="margin:4px 0 6px">Instant. Open positions keep being managed (stops, take profit, trail) until they close; new buys are paper.</div>`}
+      <button class="btn ${live ? "red" : "primary"} dis" id="modego" style="width:100%;margin-top:12px" disabled>${live ? "Switch to LIVE" : "Switch to PAPER"}</button>
+      <div class="ro" id="modemsg" style="margin-top:10px">${MODE_SEND ? "" : "Not connected yet: this app can't reach the desk, so switching from here is off. Nothing was sent."}</div>
+      <button class="btn" style="width:100%;margin-top:12px" data-act="closesheet">Close</button></div>`;
+    sh.hidden = false; sh.onclick = (e) => { if (e.target === sh) sh.hidden = true; };
+    const go = $("#modego"), inp = $("#livein");
+    const ready = () => !!MODE_SEND && (!live || (inp && inp.value === "LIVE"));
+    const upd = () => { const ok = ready(); go.disabled = !ok; go.classList.toggle("dis", !ok); };
+    if (inp) inp.addEventListener("input", upd); upd();
+    go.onclick = async () => { if (!ready()) return; go.disabled = true;
+      try { const r = await MODE_SEND(to); $("#modemsg").textContent = r && r.ok ? `Switched to ${to}` : r && r.locked ? "Live is locked on the server" : "Not switched"; }
+      catch { $("#modemsg").textContent = "Not switched: the desk didn't answer"; } };
   }
   function openSell(mint) {
     const c = S.files["coin/" + mint] || {}, s = sym(c.symbol, mint), sh = $("#sheet");
@@ -711,7 +714,7 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     const h = location.hash.slice(1).split("&").filter((x) => x && x !== "fx=demo").join("&");
     history.replaceState(history.state, "", location.pathname + location.search + (h ? "#" + h : ""));
   }
-  const DEMO = { buy: ["Buy", "rocket launch"], tp: ["Take profit", "firework"], stop: ["Stop loss", "crash"], sell: ["Trail sell", "landing"] };
+  const DEMO = { buy: ["Buy", "green rocket launch"], tp: ["Take profit", "firework"], stop: ["Stop loss", "crash"], sell: ["Sell", "red rocket landing"], land: ["Trail exit", "blue rocket landing"] };
   const demoRow = () => `<div class="prow gain demo" id="demorow"><div class="pic">★</div>
       <div class="ptx"><div class="psym">SAMPLE <span class="tag demo">PREVIEW</span></div><div class="psub">Not a real position · no trade</div></div>
       <div class="ppl"><div class="pval">$0.00</div><div class="pchg mut">effects demo</div></div></div>`;
@@ -720,20 +723,20 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     if (!S.state) { toast("Open your desk link first, then replay"); return; }
     S.demo = true; go("home");
     const calm = reduce();
-    if (!calm) { Object.values(RC).forEach(rocketSprite); for (let i = 0; i < 15 && Object.values(RC).some((c) => !rocketSprite(c)); i++) await new Promise((r) => setTimeout(r, 100)); }
+    if (!calm) { for (let i = 0; i < 20 && !warmRockets(); i++) await new Promise((r) => setTimeout(r, 100)); }
     const row0 = $("#demorow"); if (row0) row0.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
-    ["buy", "tp", "stop", "sell"].forEach((k, i) => setTimeout(() => {
+    ["buy", "tp", "stop", "sell", "land"].forEach((k, i) => setTimeout(() => {
       if (S.tab !== "home" || S.stack.length) return;            // left Home: skip the rest quietly
       const row = $("#demorow"), hero = $("#hero");
       const els = k === "tp" ? [row, hero] : k === "stop" ? [row, hero] : [row];
-      els.filter(Boolean).forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + k); setTimeout(() => el.classList.remove("fx-" + k), 2300); });
+      els.filter(Boolean).forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell", "fx-land"); void el.offsetWidth; el.classList.add("fx-" + k); setTimeout(() => el.classList.remove("fx-" + k), 2300); });
       demoBanner("PREVIEW · no trade", calm ? DEMO[k][0] + " · reduced motion is on, outline only" : DEMO[k].join(" · "), k);
       if (!calm) {
         const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
         arcade(k, k === "tp" ? hero || row : row || hero, k === "stop" ? shake : null);
       }
     }, 300 + i * 2500));
-    setTimeout(() => { S.demo = false; render(); }, 300 + 4 * 2500 + 300);
+    setTimeout(() => { S.demo = false; render(); }, 300 + 5 * 2500 + 300);
   }
   function demoBanner(t, sub, kind) {
     const el = document.createElement("div"); el.className = "ppban demo " + kind;

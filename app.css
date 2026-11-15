@@ -16,7 +16,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 [hidden]{display:none!important}
 .num{font-variant-numeric:tabular-nums}
 #view{padding:calc(var(--st) + 8px) calc(16px + var(--sr)) calc(96px + var(--sb)) calc(16px + var(--sl));min-height:100vh}
-.offline{position:sticky;top:0;z-index:30;background:var(--red);color:#fff;font-size:14px;font-weight:600;padding:calc(var(--st) + 10px) 16px 10px;text-align:center}
+.offline{position:sticky;top:0;z-index:30;background:#2a2112;color:#ffc36b;border-bottom:1px solid rgba(255,166,43,.3);font-size:14px;font-weight:600;padding:calc(var(--st) + 10px) 16px 10px;text-align:center}
 .offline + #view{padding-top:8px}
 
 /* navbar */
@@ -215,7 +215,7 @@ body::before{content:"";position:fixed;inset:-20vh -20vw;z-index:-1;pointer-even
 .pphead{display:flex;align-items:center;gap:8px;min-height:52px;margin-bottom:10px;position:sticky;top:0;z-index:15;
   padding:calc(var(--st) + 6px) 2px 6px;margin-top:calc(-8px - var(--st));background:linear-gradient(#05070bf0 60%,#05070b00)}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
-.pplogo{width:36px;height:36px;flex:none;filter:drop-shadow(0 0 10px rgba(0,245,160,.35))}
+.pplogo{width:36px;height:36px;flex:none;display:block;box-sizing:border-box;border-radius:9px;object-fit:cover;border:1.5px solid transparent;background:linear-gradient(#0b1411,#0b1411) padding-box,linear-gradient(135deg,#00f5a0,#00c2ff) border-box;box-shadow:0 0 10px rgba(0,245,160,.35),0 0 18px -4px rgba(0,194,255,.35)}
 .bname{font:800 20px/1 var(--disp);letter-spacing:-.3px;white-space:nowrap}
 .bname span{background:linear-gradient(90deg,#00f5a0,#00c2ff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .btag{font-size:11px;color:var(--ter);margin-top:3px;white-space:nowrap;letter-spacing:.2px}
@@ -335,34 +335,50 @@ h1.title{background:linear-gradient(90deg,#fff,#bfe8ff);-webkit-background-clip:
 .fx-tp{animation:fxTp 2s ease-out!important}
 .fx-stop{animation:fxStop 1.4s ease-out!important}
 .fx-sell{animation:fxSell 1.4s ease-out!important}
-@keyframes fxBuy{0%{box-shadow:0 0 0 2px #00f5a0,0 0 40px 4px rgba(0,245,160,.8);background:rgba(0,245,160,.22)}100%{}}
-@keyframes fxSell{0%{box-shadow:0 0 0 2px #00c2ff,0 0 36px 2px rgba(0,194,255,.7);background:rgba(0,194,255,.2)}100%{}}
+.fx-land{animation:fxLand 1.4s ease-out!important}
+@keyframes fxBuy{0%{box-shadow:0 0 0 2px #00e676,0 0 40px 4px rgba(0,230,118,.7);background:rgba(0,230,118,.18)}100%{}}
+@keyframes fxSell{0%{box-shadow:0 0 0 2px #ff3b4f,0 0 36px 2px rgba(255,59,79,.6);background:rgba(255,59,79,.16)}100%{}}
+@keyframes fxLand{0%{box-shadow:0 0 0 2px #2f7bff,0 0 36px 2px rgba(47,123,255,.7);background:rgba(47,123,255,.2)}100%{}}
 @keyframes fxStop{0%{box-shadow:0 0 0 2px #ff4d6d,0 0 40px 4px rgba(255,77,109,.85);background:rgba(255,77,109,.25);transform:translateX(0)}
   8%{transform:translateX(-9px)}16%{transform:translateX(8px)}24%{transform:translateX(-7px)}32%{transform:translateX(6px)}40%{transform:translateX(-4px)}48%{transform:translateX(2px)}56%{transform:translateX(0)}100%{}}
 .ppban{position:fixed;left:50%;top:calc(var(--st) + 12px);transform:translate(-50%,0);z-index:70;padding:10px 16px;border-radius:16px;font-size:15px;
   background:rgba(10,14,20,.92);border:1px solid var(--glass-b);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);white-space:nowrap;animation:banIn .35s cubic-bezier(.2,.9,.3,1.3);transition:opacity .5s,transform .5s}
 .ppban.out{opacity:0;transform:translate(-50%,-14px)}
 .ppban b{font-weight:800}.ppban span{font-weight:700;margin-left:4px}
-.ppban.buy{border-color:rgba(0,245,160,.6);box-shadow:0 0 30px rgba(0,245,160,.35)}.ppban.buy b,.ppban.buy span{color:var(--green)}
-.ppban.tp{border-color:rgba(255,201,64,.7);box-shadow:0 0 34px rgba(255,201,64,.45)}.ppban.tp b,.ppban.tp span{color:var(--gold)}
+.ppban.buy{border-color:rgba(0,230,118,.7);box-shadow:0 0 30px rgba(0,230,118,.4)}.ppban.buy b,.ppban.buy span{color:#00e676}
+.ppban.tp{border-color:rgba(25,230,193,.7);box-shadow:0 0 34px rgba(25,230,193,.45)}.ppban.tp b,.ppban.tp span{color:#19e6c1}
 .ppban.stop{border-color:rgba(255,77,109,.7);box-shadow:0 0 30px rgba(255,77,109,.4)}.ppban.stop b,.ppban.stop span{color:var(--red)}
-.ppban.sell b,.ppban.sell span{color:var(--blue)}
+.ppban.sell{border-color:rgba(255,59,79,.7);box-shadow:0 0 30px rgba(255,59,79,.35)}.ppban.sell b,.ppban.sell span{color:#ff5a6b}
+.ppban.land{border-color:rgba(47,123,255,.7);box-shadow:0 0 30px rgba(47,123,255,.4)}.ppban.land b,.ppban.land span{color:#5fa0ff}
 @keyframes banIn{from{opacity:0;transform:translate(-50%,-16px) scale(.96)}}
 .arcade{position:fixed;inset:0;width:100vw;height:100vh;z-index:68;pointer-events:none}
 .pp-shake{animation:ppShake .5s cubic-bezier(.36,.07,.19,.97)}
 @keyframes ppShake{10%,90%{transform:translate3d(-1px,1px,0)}20%,80%{transform:translate3d(3px,-2px,0)}30%,50%,70%{transform:translate3d(-5px,2px,0)}40%,60%{transform:translate3d(5px,-1px,0)}}
-@keyframes fxTp{0%,30%{box-shadow:0 0 0 2px #ffd447,0 0 50px 8px rgba(255,201,64,.85),0 0 90px 10px rgba(0,245,160,.35);background:rgba(255,201,64,.24)}55%{box-shadow:0 0 0 2px #00f5a0,0 0 40px 4px rgba(0,245,160,.6)}100%{}}
+@keyframes fxTp{0%,30%{box-shadow:0 0 0 2px #19e6c1,0 0 50px 8px rgba(25,230,193,.8),0 0 90px 10px rgba(0,245,160,.35);background:rgba(25,230,193,.2)}55%{box-shadow:0 0 0 2px #00f5a0,0 0 40px 4px rgba(0,245,160,.55)}100%{}}
 
 @media (prefers-reduced-motion: reduce){
   body::before,.prow.gain,.prow.loss,.bchip .light,.mbadge.live i,.fn.live i,.tw{animation:none!important}
-  .fx-buy,.fx-tp,.fx-stop,.fx-sell{animation-duration:.01s!important}
-  .fx-buy{outline:2px solid var(--green)}.fx-tp{outline:2px solid var(--gold)}.fx-stop{outline:2px solid var(--red)}.fx-sell{outline:2px solid var(--blue)}
+  .fx-buy,.fx-tp,.fx-stop,.fx-sell,.fx-land{animation-duration:.01s!important}
+  .fx-buy{outline:2px solid #00e676}.fx-tp{outline:2px solid #19e6c1}.fx-stop{outline:2px solid var(--red)}.fx-sell{outline:2px solid #ff3b4f}.fx-land{outline:2px solid #2f7bff}
   .ppban{animation:none;transition:none}.arcade{display:none}.pp-shake{animation:none!important}
 }
 #a2hs{background:linear-gradient(90deg,#00b37a,#0096c7);border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,194,255,.3)}
 
 /* effects preview */
-.tag.demo{color:#1a1200;background:#ffd447}
-.prow.demo{border-style:dashed;border-color:rgba(255,212,71,.55);box-shadow:none;animation:none}
-.prow.demo .pic{background:rgba(255,212,71,.18);color:#ffd447}
+.tag.demo{color:#00140f;background:#19e6c1}
+.prow.demo{border-style:dashed;border-color:rgba(25,230,193,.55);box-shadow:none;animation:none}
+.prow.demo .pic{background:rgba(25,230,193,.16);color:#19e6c1}
 .ppban.demo{font-size:14px;max-width:calc(100vw - 24px);white-space:normal;text-align:center}.ppban.demo span{font-weight:500;color:var(--sec)!important}
+
+/* desk not reachable: calm STANDBY pill, no pulse */
+.mbadge.standby{color:#ffc36b;background:rgba(255,166,43,.1);border:1px solid rgba(255,166,43,.35)}
+.mbadge.standby i{width:7px;height:7px;border-radius:50%;background:#c9a15a;box-shadow:none;animation:none}
+
+/* PAPER | LIVE segmented switch */
+.modeseg{display:flex;gap:4px;background:var(--c1);border:1px solid var(--glass-b);border-radius:14px;padding:4px}
+.modeseg button{flex:1;min-height:44px;border-radius:10px;font:700 15px var(--txt);color:var(--sec);letter-spacing:.3px}
+.modeseg button.on.paper{background:rgba(255,166,43,.16);color:#ffc36b;box-shadow:inset 0 0 0 1px rgba(255,166,43,.45)}
+.modeseg button.on.live{background:rgba(0,245,160,.14);color:var(--green);box-shadow:inset 0 0 0 1px rgba(0,245,160,.45),0 0 16px -4px rgba(0,245,160,.5)}
+.mrows{display:grid;gap:6px;margin-top:8px}.mrows div{display:flex;justify-content:space-between;gap:10px;background:var(--c2);border-radius:10px;padding:9px 12px;font-size:14px}
+.mrows span{color:var(--sec)}.mrows b{text-align:right}
+.livein{width:100%;height:46px;margin-top:6px;border-radius:12px;border:1px solid var(--glass-b);background:#0b0f15;color:#fff;font:700 18px var(--mono);text-align:center;letter-spacing:4px}
