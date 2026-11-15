@@ -360,3 +360,9 @@ h1.title{background:linear-gradient(90deg,#fff,#bfe8ff);-webkit-background-clip:
   .ppban{animation:none;transition:none}.arcade{display:none}.pp-shake{animation:none!important}
 }
 #a2hs{background:linear-gradient(90deg,#00b37a,#0096c7);border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,194,255,.3)}
+
+/* effects preview */
+.tag.demo{color:#1a1200;background:#ffd447}
+.prow.demo{border-style:dashed;border-color:rgba(255,212,71,.55);box-shadow:none;animation:none}
+.prow.demo .pic{background:rgba(255,212,71,.18);color:#ffd447}
+.ppban.demo{font-size:14px;max-width:calc(100vw - 24px);white-space:normal;text-align:center}.ppban.demo span{font-weight:500;color:var(--sec)!important}

@@ -191,7 +191,8 @@
         <section class="a-bots">${botStrip()}</section>
         <section class="a-pos">
           <h2 class="sec">Open positions <span class="count">· ${pos.length}</span></h2>
-          ${pos.length ? `<div class="plist">${pos.map(posCard).join("")}</div>` : '<div class="empty glass"><b>No open positions</b>Risk is watching for the next entry.</div>'}
+          ${S.demo ? `<div class="plist">${demoRow()}</div>` : ""}
+          ${pos.length ? `<div class="plist">${pos.map(posCard).join("")}</div>` : S.demo ? "" : '<div class="empty glass"><b>No open positions</b>Risk is watching for the next entry.</div>'}
         </section>
         <section class="a-frame">
           <h2 class="sec">FOMO screen ${frameNote(scr)}</h2>
@@ -558,6 +559,7 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
         ${fomoLink(ac.profile_url) ? `<a class="row" href="${esc(ac.profile_url)}" target="_blank" rel="noopener noreferrer"><div class="tx"><div class="t1">Your FOMO profile</div><div class="t2">@${esc(ac.fomo_handle)}</div></div><span class="ter">›</span></a>` : ""}
         ${fomoLink(ac.invite_url) ? `<button class="row" data-act="invite" style="width:100%;text-align:left"><div class="tx"><div class="t1">Invite a friend</div><div class="t2">Share your FOMO invite link</div></div><span class="ter">›</span></button>` : ""}
       </div>
+      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop and trail on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
       <div class="grp">Pushes</div><div class="list plain">
         <div class="row"><div class="tx"><div class="t1">Telegram</div><div class="t2">${ac.pushes && ac.pushes.telegram ? "connected" : "not connected yet (STEP 11)"}</div></div></div>
@@ -648,6 +650,7 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     else if (act === "sell") openSell(t.dataset.mint);
     else if (act === "invite") invite();
     else if (act === "closesheet") $("#sheet").hidden = true;
+    else if (act === "fxdemo") fxDemo();
   });
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 1800); }
   async function invite() {
@@ -700,15 +703,56 @@ ${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a
     document.body.appendChild(d);
   }
 
+  // ---------- effects preview (#fx=demo or Account > Replay effects): local only, no data written, no calls to the desk ----------
+  // Plays buy -> take profit -> stop -> trail on Home, 2.5 s apart, over one clearly fake sample row that only exists in the DOM.
+  const fxFlag = () => /[#&]fx=demo\b/.test(location.hash);
+  function stripFxFlag() {     // drop only fx=demo from the hash; a #d= link stays exactly as it was
+    if (!fxFlag()) return;
+    const h = location.hash.slice(1).split("&").filter((x) => x && x !== "fx=demo").join("&");
+    history.replaceState(history.state, "", location.pathname + location.search + (h ? "#" + h : ""));
+  }
+  const DEMO = { buy: ["Buy", "rocket launch"], tp: ["Take profit", "firework"], stop: ["Stop loss", "crash"], sell: ["Trail sell", "landing"] };
+  const demoRow = () => `<div class="prow gain demo" id="demorow"><div class="pic">★</div>
+      <div class="ptx"><div class="psym">SAMPLE <span class="tag demo">PREVIEW</span></div><div class="psub">Not a real position · no trade</div></div>
+      <div class="ppl"><div class="pval">$0.00</div><div class="pchg mut">effects demo</div></div></div>`;
+  async function fxDemo() {
+    if (S.demo) return;
+    if (!S.state) { toast("Open your desk link first, then replay"); return; }
+    S.demo = true; go("home");
+    const calm = reduce();
+    if (!calm) { Object.values(RC).forEach(rocketSprite); for (let i = 0; i < 15 && Object.values(RC).some((c) => !rocketSprite(c)); i++) await new Promise((r) => setTimeout(r, 100)); }
+    const row0 = $("#demorow"); if (row0) row0.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
+    ["buy", "tp", "stop", "sell"].forEach((k, i) => setTimeout(() => {
+      if (S.tab !== "home" || S.stack.length) return;            // left Home: skip the rest quietly
+      const row = $("#demorow"), hero = $("#hero");
+      const els = k === "tp" ? [row, hero] : k === "stop" ? [row, hero] : [row];
+      els.filter(Boolean).forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + k); setTimeout(() => el.classList.remove("fx-" + k), 2300); });
+      demoBanner("PREVIEW · no trade", calm ? DEMO[k][0] + " · reduced motion is on, outline only" : DEMO[k].join(" · "), k);
+      if (!calm) {
+        const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
+        arcade(k, k === "tp" ? hero || row : row || hero, k === "stop" ? shake : null);
+      }
+    }, 300 + i * 2500));
+    setTimeout(() => { S.demo = false; render(); }, 300 + 4 * 2500 + 300);
+  }
+  function demoBanner(t, sub, kind) {
+    const el = document.createElement("div"); el.className = "ppban demo " + kind;
+    el.innerHTML = `<b>${esc(t)}</b> <span>${esc(sub)}</span>`;
+    document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 2100); setTimeout(() => el.remove(), 2700);
+  }
+  addEventListener("hashchange", () => { if (fxFlag()) { stripFxFlag(); if (S.state) fxDemo(); } });
+
   // ---------- start ----------
   async function start() {
+    const wantDemo = fxFlag(); stripFxFlag();
     S.dp = DeskCrypto.dataPath(); // takes #d= into localStorage; strips it only in the home-screen app (iOS storage is separate)
     S.a2hs = !DeskCrypto.isStandalone() && DeskCrypto.linkInUrl() && localStorage.getItem("desk.a2hs.off") !== "1";
     if (S.a2hs) showA2hs();
-    if (window.__DESK_FIXTURE) return fixture(window.__DESK_FIXTURE);
-    if (!S.dp) { render(); return; }
+    if (window.__DESK_FIXTURE) { fixture(window.__DESK_FIXTURE); if (wantDemo) setTimeout(fxDemo, 800); return; }
+    if (!S.dp) { render(); if (wantDemo) setTimeout(() => toast("Open your desk link first, then replay"), 500); return; }
     S.desk = await DeskCrypto.open(S.dp, BASE);
     render(); await poll();
+    if (wantDemo) setTimeout(fxDemo, 600);
     setInterval(poll, POLL_S * 1000);
     setInterval(() => { const g = $("#gaten"); if (g) g.textContent = Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000)); }, 1000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
