@@ -231,7 +231,7 @@
   }
 
   // ---------- Pump Pilot: trade effects, from diffing activity rows + positions between polls ----------
-  // buy -> rocket launch + green glow; take-profit (or tp_done 0->1) -> firework + gold/green flash; stop -> crash + red flash + shake; sell -> rocket landing
+  // buy -> green rocket launch + green glow; take-profit (or tp_done 0->1) -> rocket detonates into a firework + gold/green flash; stop -> red rocket stalls, tumbles, crashes + red flash + shake; sell -> blue rocket landing
   const FX = { seen: null, pos: null, queue: [] };
   function fxDiff(state, act) {
     const rows = (act && act.rows) || [], pos = Object.fromEntries(((state && state.positions) || []).map((p) => [p.mint, p]));
@@ -263,8 +263,8 @@
       const vis = all.find((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
       if (!calm) {
         const row = targets.find((el) => el === vis) || vis || hero;
-        arcade(e.kind, e.kind === "tp" ? (hero || row) : row);
-        if (e.kind === "stop") { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } }
+        const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
+        arcade(e.kind, e.kind === "tp" ? (hero || row) : row, e.kind === "stop" ? shake : null);
       }
     }, i * 700));
   }
@@ -277,43 +277,94 @@
     el.innerHTML = `<b>${esc(t)}</b> ${esc(s)}${r && r.value ? ` <span>${esc(String(r.value).split(" · ")[0])}</span>` : ""}`;
     document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 2600); setTimeout(() => el.remove(), 3200);
   }
+  // ---------- Pump Pilot rocket (hand-written SVG, accent colour is a parameter; master copy = web/rocket.svg) ----------
+  const ppShade = (hex, f) => { const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f));
+    return "#" + c.map((v) => v.toString(16).padStart(2, "0")).join(""); };
+  function rocketSVG(acc, parts = "all") {
+    const L = ppShade(acc, 0.45), D = ppShade(acc, -0.45), DD = ppShade(acc, -0.7), id = "r" + acc.slice(1) + parts;
+    const body = parts !== "flame", flame = parts !== "body";
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 220" width="100" height="220">
+<defs>
+<linearGradient id="${id}m" x1="0" x2="1"><stop offset="0" stop-color="#4a525f"/><stop offset=".18" stop-color="#9aa4b3"/><stop offset=".38" stop-color="#ffffff"/><stop offset=".55" stop-color="#d5dce6"/><stop offset=".8" stop-color="#7d8796"/><stop offset="1" stop-color="#3a414c"/></linearGradient>
+<linearGradient id="${id}a" x1="0" x2="1"><stop offset="0" stop-color="${DD}"/><stop offset=".3" stop-color="${acc}"/><stop offset=".42" stop-color="${L}"/><stop offset=".62" stop-color="${acc}"/><stop offset="1" stop-color="${DD}"/></linearGradient>
+<linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${L}"/><stop offset=".55" stop-color="${acc}"/><stop offset="1" stop-color="${D}"/></linearGradient>
+<linearGradient id="${id}n" x1="0" x2="1"><stop offset="0" stop-color="#1b1f26"/><stop offset=".4" stop-color="#6c7482"/><stop offset=".6" stop-color="#3b414b"/><stop offset="1" stop-color="#121418"/></linearGradient>
+<radialGradient id="${id}g" cx=".38" cy=".35" r=".75"><stop offset="0" stop-color="${L}"/><stop offset=".45" stop-color="${D}"/><stop offset="1" stop-color="#05080c"/></radialGradient>
+<linearGradient id="${id}x" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe6"/><stop offset=".25" stop-color="#ffd447"/><stop offset=".6" stop-color="#ff7a1a"/><stop offset="1" stop-color="#ff3d00" stop-opacity="0"/></linearGradient>
+<linearGradient id="${id}y" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#fff1a8"/><stop offset="1" stop-color="#ffd447" stop-opacity="0"/></linearGradient>
+</defs>
+${flame ? `<g><path d="M31 164 C 27 186, 40 204, 50 219 C 60 204, 73 186, 69 164 Z" fill="url(#${id}x)" opacity=".95"/>
+<path d="M39 164 C 37 180, 45 192, 50 203 C 55 192, 63 180, 61 164 Z" fill="url(#${id}y)"/>
+<ellipse cx="50" cy="166" rx="15" ry="3.5" fill="#fff7d0" opacity=".9"/></g>` : ""}
+${body ? `<g>
+<path d="M30 104 C 14 116, 7 136, 6 162 C 13 156, 21 151, 30 148 Z" fill="url(#${id}f)" stroke="${DD}" stroke-width="1"/>
+<path d="M70 104 C 86 116, 93 136, 94 162 C 87 156, 79 151, 70 148 Z" fill="url(#${id}f)" stroke="${DD}" stroke-width="1"/>
+<path d="M36 148 L64 148 L70 166 L30 166 Z" fill="url(#${id}n)" stroke="#0b0d10" stroke-width=".8"/>
+<path d="M31 166 L69 166 L68 162 L32 162 Z" fill="#ff9a3c" opacity=".55"/>
+<path d="M50 3 C 71 27, 76 66, 74 110 L 71 149 L 29 149 L 26 110 C 24 66, 29 27, 50 3 Z" fill="url(#${id}m)" stroke="#2a3038" stroke-width="1"/>
+<path d="M50 3 C 64 19, 70 35, 72 50 L 28 50 C 30 35, 36 19, 50 3 Z" fill="url(#${id}a)"/>
+<path d="M28 50 L72 50" stroke="#1e232a" stroke-width="1.6"/><path d="M28.4 52 L71.6 52" stroke="#ffffff" stroke-opacity=".35" stroke-width=".8"/>
+<rect x="26" y="116" width="48" height="9" fill="url(#${id}a)"/><path d="M26 116 H74 M26 125 H74" stroke="#1e232a" stroke-width="1"/>
+<path d="M27 136 H73" stroke="#1e232a" stroke-opacity=".6" stroke-width=".8"/>
+<circle cx="50" cy="80" r="13" fill="url(#${id}m)" stroke="#262b33" stroke-width="1.2"/>
+<circle cx="50" cy="80" r="9.2" fill="url(#${id}g)" stroke="#0b0e12" stroke-width="1"/>
+<ellipse cx="46.5" cy="76.5" rx="3.6" ry="2.2" fill="#fff" opacity=".75" transform="rotate(-30 46.5 76.5)"/>
+${[0, 60, 120, 180, 240, 300].map((a) => `<circle cx="${(50 + 11.2 * Math.cos((a * Math.PI) / 180)).toFixed(2)}" cy="${(80 + 11.2 * Math.sin((a * Math.PI) / 180)).toFixed(2)}" r=".9" fill="#2a3038"/>`).join("")}
+<path d="M44 22 C 36 40, 33 72, 34 140" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+<path d="M48 128 L52 128 L53.5 158 L46.5 158 Z" fill="url(#${id}f)" stroke="${DD}" stroke-width=".8"/>
+</g>` : ""}
+</svg>`;
+  }
   // ---------- Pump Pilot arcade effects: one canvas overlay per effect, rAF, removed after ~2 s (fire-and-forget) ----------
-  // buy = rocket launch, tp = firework + shockwave + flash, stop = tumbling crash + red sparks + shake, sell = rocket landing
+  // The rocket is the SVG above, pre-rendered once per colour into an offscreen bitmap (cached), so a frame is one drawImage.
+  // buy = green launch; tp = green launch + green/gold firework + shockwave; stop = red stall, tumble, crash + shake; sell = blue landing + puff
+  const RKT = {}, RC = { buy: "#22e584", tp: "#22e584", stop: "#ff4d6d", sell: "#4da3ff" };
+  function rocketSprite(acc) {
+    const o = RKT[acc]; if (o) return o.ready ? o : null;
+    const n = (RKT[acc] = { ready: false });
+    const mk = (parts) => new Promise((res) => { const im = new Image();
+      im.onload = () => { const c = document.createElement("canvas"); c.width = 200; c.height = 440; c.getContext("2d").drawImage(im, 0, 0, 200, 440); res(c); };
+      im.onerror = () => res(null); im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(rocketSVG(acc, parts)); });
+    Promise.all([mk("body"), mk("flame")]).then(([b, f]) => { if (b && f) Object.assign(n, { body: b, flame: f, ready: true }); else delete RKT[acc]; });
+    return null;
+  }
+  setTimeout(() => { if (!reduce()) Object.values(RC).forEach(rocketSprite); }, 1200);   // warm the 3 bitmaps after the first paint
   let arcadeLive = 0;
-  function arcade(kind, anchor) {
+  function arcade(kind, anchor, onImpact) {
     if (arcadeLive >= 3 || document.hidden) return;
     const W = innerWidth, H = innerHeight, dpr = Math.min(2, devicePixelRatio || 1);
     const cv = document.createElement("canvas"); cv.className = "arcade"; cv.width = W * dpr; cv.height = H * dpr;
     document.body.appendChild(cv); arcadeLive++;
     const g = cv.getContext("2d"); g.scale(dpr, dpr);
+    const spr = rocketSprite(RC[kind]), SZ = W < 600 ? 34 : 42, RH = SZ * 2.2;
     const r = anchor ? anchor.getBoundingClientRect() : { left: W / 2 - 50, top: H / 2, width: 100, height: 40 };
-    const ax = Math.min(W - 40, Math.max(40, r.left + r.width * (kind === "buy" || kind === "stop" ? 0.82 : 0.5))), ay = Math.min(H - 30, Math.max(30, r.top + r.height / 2));
-    const P = [], rnd = (a, b) => a + Math.random() * (b - a), D = kind === "tp" ? 2000 : 1900;
+    const clampX = (x) => Math.min(W - 40, Math.max(40, x)), clampY = (y) => Math.min(H - 30, Math.max(30, y));
+    const ax = clampX(r.left + r.width * (kind === "tp" ? 0.5 : 0.82)), ay = clampY(r.top + r.height / 2);
+    const P = [], rings = [], rnd = (a, b) => a + Math.random() * (b - a), D = 2000;
+    let flash = null;
     const add = (o) => P.push(Object.assign({ vx: 0, vy: 0, g: 0, drag: 1, life: 1, age: 0, s: 3, c: "#fff", glow: 0, grow: 0 }, o));
-    const burst = (x, y, n, sp, cols, life = 1.1) => { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), v = rnd(sp * 0.35, sp);
-      add({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 180, drag: 0.965, life: rnd(life * 0.6, life), s: rnd(1.6, 3.4), c: cols[i % cols.length], glow: 10, trail: true }); } };
-    const rings = [], rocket = { x: ax, y: ay, a: -Math.PI / 2, vy: 0, vx: 0, spin: 0, on: kind !== "tp" };
-    if (kind === "buy") { rocket.y = Math.min(H + 30, ay + 10); rocket.vy = -120; }
-    if (kind === "stop") { rocket.x = ax; rocket.y = Math.max(-20, ay - 120); rocket.a = Math.PI / 2 - 0.4; rocket.vy = 60; rocket.vx = rnd(-40, 40); rocket.spin = 7; }
-    if (kind === "sell") { rocket.y = -40; rocket.a = -Math.PI / 2; rocket.vy = 0; rocket.land = ay - 26; }
-    if (kind === "tp") {
-      burst(ax, ay, 110, 520, ["#00f5a0", "#ffd447", "#ffb800", "#7dffcf", "#fff3b0"], 1.4);
-      rings.push({ x: ax, y: ay, t0: 0, c: "255,212,71" }, { x: ax, y: ay, t0: 0.12, c: "0,245,160" });
-      setTimeout(() => { if (cv.isConnected) { const x = ax + rnd(-120, 120), y = ay + rnd(-140, -60); burst(x, y, 50, 300, ["#00f5a0", "#ffd447"], 1); rings.push({ x, y, t0: (performance.now() - t0) / 1000, c: "0,245,160", small: 1 }); } }, 320);
-      setTimeout(() => { if (cv.isConnected) { const x = ax + rnd(-120, 120), y = ay + rnd(-160, -60); burst(x, y, 50, 300, ["#ffd447", "#fff3b0"], 1); rings.push({ x, y, t0: (performance.now() - t0) / 1000, c: "255,212,71", small: 1 }); } }, 560);
-    }
-    const drawRocket = (x, y, a, flame, tint) => {
-      g.save(); g.translate(x, y); g.rotate(a + Math.PI / 2);
-      if (flame) { const f = rnd(0.75, 1.25); const fg = g.createLinearGradient(0, 14, 0, 14 + 30 * f); fg.addColorStop(0, "#fff7c2"); fg.addColorStop(0.35, "#ffb800"); fg.addColorStop(1, "rgba(255,77,0,0)");
-        g.fillStyle = fg; g.beginPath(); g.moveTo(-6, 14); g.quadraticCurveTo(0, 14 + 34 * f, 6, 14); g.fill(); }
-      g.shadowColor = tint; g.shadowBlur = 16;
-      g.fillStyle = "#e9f1ff"; g.beginPath(); g.moveTo(0, -20); g.bezierCurveTo(9, -10, 9, 6, 7, 14); g.lineTo(-7, 14); g.bezierCurveTo(-9, 6, -9, -10, 0, -20); g.fill();
-      g.shadowBlur = 0; g.fillStyle = tint; g.beginPath(); g.moveTo(-7, 4); g.lineTo(-13, 16); g.lineTo(-6, 14); g.fill(); g.beginPath(); g.moveTo(7, 4); g.lineTo(13, 16); g.lineTo(6, 14); g.fill();
-      g.beginPath(); g.moveTo(0, -20); g.bezierCurveTo(5, -15, 7, -11, 7.5, -8); g.lineTo(-7.5, -8); g.bezierCurveTo(-7, -11, -5, -15, 0, -20); g.fill();
-      g.fillStyle = "#0b1a2a"; g.beginPath(); g.arc(0, -2, 3.6, 0, Math.PI * 2); g.fill(); g.strokeStyle = tint; g.lineWidth = 1.4; g.stroke();
+    const burst = (x, y, n, sp, cols, life = 1.1, grav = 170) => { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), v = rnd(sp * 0.3, sp);
+      add({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: grav, drag: 0.962, life: rnd(life * 0.55, life), s: rnd(1.6, 3.4), c: cols[i % cols.length], glow: 10, trail: true }); } };
+    const puff = (x, y, n, col, sp = 90, big = 1) => { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), v = rnd(10, sp);
+      add({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - 10, drag: 0.94, life: rnd(0.6, 1.1), s: rnd(5, 10) * big, grow: 26 * big, c: col, smoke: true }); } };
+    // rocket state: a = angle (0 = nose up), fl = flame scale (0 = off)
+    const R = { x: ax, y: ay, a: 0, vx: 0, vy: 0, fl: 1, on: true, alpha: 1 };
+    if (kind === "buy") { R.y = clampY(ay + 6); R.vy = -70; }
+    if (kind === "tp") { R.y0 = Math.min(H - 20, r.top + r.height - 30); R.y = R.y0; R.yA = Math.max(70, r.top + 50); }
+    if (kind === "stop") { R.y0 = ay; }
+    if (kind === "sell") { R.y = -RH; R.land = clampY(r.top - 4) - RH * 0.3; }
+    const exhaust = () => ({ x: R.x - Math.sin(R.a) * RH * 0.32, y: R.y + Math.cos(R.a) * RH * 0.32 });
+    function drawRocket() {
+      if (!spr || !R.on) return;
+      g.save(); g.globalAlpha = R.alpha; g.translate(R.x, R.y); g.rotate(R.a);
+      const top = -RH * (100 / 220);
+      if (R.fl > 0.02) { const ny = top + RH * (164 / 220);
+        const gl = g.createRadialGradient(0, ny + 8, 0, 0, ny + 8, SZ * 1.1 * R.fl); gl.addColorStop(0, "rgba(255,200,80,.55)"); gl.addColorStop(1, "rgba(255,120,0,0)");
+        g.fillStyle = gl; g.beginPath(); g.arc(0, ny + 8, SZ * 1.1 * R.fl, 0, Math.PI * 2); g.fill();
+        g.save(); g.translate(0, ny); g.scale(rnd(0.86, 1.08), R.fl * rnd(0.82, 1.22)); g.drawImage(spr.flame, -SZ / 2, -RH * (164 / 220), SZ, RH); g.restore(); }
+      g.drawImage(spr.body, -SZ / 2, top, SZ, RH);
       g.restore();
-    };
-    const tint = kind === "stop" ? "#ff4d6d" : kind === "sell" ? "#00c2ff" : "#00f5a0";
+    }
     const t0 = performance.now(); let last = t0;
     const kill = () => { if (!cv.isConnected) return; cv.remove(); arcadeLive--; };
     const hard = setTimeout(kill, D + 600);       // even if rAF is paused (tab hidden)
@@ -321,36 +372,59 @@
       if (!cv.isConnected) return;
       const t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000); last = now;
       g.clearRect(0, 0, W, H);
-      if (kind === "tp" && t < 0.35) { g.fillStyle = `rgba(255,232,150,${0.32 * (1 - t / 0.35)})`; g.fillRect(0, 0, W, H); }
-      if (kind === "stop" && t < 0.3) { g.fillStyle = `rgba(255,40,70,${0.18 * (1 - t / 0.3)})`; g.fillRect(0, 0, W, H); }
-      for (const rg of rings) { const k = (t - rg.t0) / 0.7; if (k < 0 || k > 1) continue;
-        g.strokeStyle = `rgba(${rg.c},${1 - k})`; g.lineWidth = (rg.small ? 3 : 6) * (1 - k) + 1; g.beginPath(); g.arc(rg.x, rg.y, (rg.small ? 70 : 170) * (1 - Math.pow(1 - k, 3)), 0, Math.PI * 2); g.stroke(); }
-      if (rocket.on) {
-        if (kind === "buy") { rocket.vy -= 900 * dt; rocket.x += Math.sin(t * 9) * 0.6; }
-        if (kind === "stop") { rocket.vy += 700 * dt; rocket.a += rocket.spin * dt; rocket.x += rocket.vx * dt; }
-        if (kind === "sell") { const d = rocket.land - rocket.y; rocket.vy = Math.max(30, d * 3.2); if (d < 2 && !rocket.done) { rocket.done = t; burst(rocket.x, rocket.y + 18, 26, 160, ["#00c2ff", "#bfefff"], 0.7); } }
-        rocket.y += rocket.vy * dt;
-        const ex = rocket.x - Math.cos(rocket.a) * 26, ey = rocket.y - Math.sin(rocket.a) * 26;
-        if (!(kind === "sell" && rocket.done)) for (let i = 0; i < 3; i++) {
-          add({ x: ex + rnd(-3, 3), y: ey + rnd(-3, 3), vx: rnd(-25, 25) - Math.cos(rocket.a) * 60, vy: rnd(-10, 10) - Math.sin(rocket.a) * 60, life: rnd(0.5, 0.9), s: rnd(4, 8), grow: 22, c: kind === "stop" ? "70,70,80" : "180,190,210", smoke: true });
-          if (kind === "stop") add({ x: ex, y: ey, vx: rnd(-140, 140), vy: rnd(-160, 40), g: 400, life: rnd(0.3, 0.6), s: rnd(1.4, 2.6), c: i ? "#ff4d6d" : "#ffb03a", glow: 8 });
-          else if (kind === "buy") add({ x: ex, y: ey, vx: rnd(-60, 60), vy: rnd(40, 160), g: 200, life: rnd(0.25, 0.5), s: rnd(1.2, 2.4), c: i ? "#00f5a0" : "#ffd447", glow: 8 });
-        }
-        if (kind === "stop" && rocket.y > H - 40 && !rocket.boom) { rocket.boom = 1; burst(rocket.x, H - 40, 60, 360, ["#ff4d6d", "#ff8a3a", "#ffd0d0"], 0.9); rings.push({ x: rocket.x, y: H - 40, t0: t, c: "255,77,109", small: 1 }); rocket.on = false; }
-        if (rocket.on) drawRocket(rocket.x, rocket.y, rocket.a, !(kind === "sell" && rocket.done && t - rocket.done > 0.15), tint);
-        if (kind === "buy" && rocket.y < -80) rocket.on = false;
-      }
+      // ---- choreography ----
+      if (kind === "buy" && R.on) { R.vy -= 1000 * dt; R.y += R.vy * dt; R.a = Math.sin(t * 11) * 0.035; R.fl = rnd(0.85, 1.15); if (R.y < -RH) R.on = false; }
+      if (kind === "tp" && R.on) { const k = Math.min(1, t / 0.6); R.y = R.y0 + (R.yA - R.y0) * k * k; R.a = Math.sin(t * 13) * 0.03; R.fl = rnd(0.9, 1.25);
+        if (k >= 1) { R.on = false; flash = { t, c: "255,232,150", a: 0.38, d: 0.35 };
+          burst(R.x, R.y, 130, 540, ["#22e584", "#ffd447", "#ffb800", "#8dffc4", "#fff3b0"], 1.3);
+          for (let i = 0; i < 10; i++) { const a = rnd(0, Math.PI * 2), v = rnd(80, 260); add({ x: R.x, y: R.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 0.95, g: 40, life: rnd(0.8, 1.2), s: rnd(5, 9), c: i % 2 ? "#ffffff" : "#ffd447", glow: 12, star: true }); }
+          rings.push({ x: R.x, y: R.y, t0: t, c: "255,212,71", R: 180 }, { x: R.x, y: R.y, t0: t + 0.1, c: "34,229,132", R: 130 });
+          const bx = R.x, by = R.y;
+          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#22e584", "#ffd447"], 0.9); rings.push({ x, y, t0: tt, c: "34,229,132", R: 70 }); }, 240);
+          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#ffd447", "#fff3b0"], 0.9); rings.push({ x, y, t0: tt, c: "255,212,71", R: 70 }); }, 430); } }
+      if (kind === "stop" && R.on) {
+        if (t < 0.5) { R.y = R.y0 - 46 * Math.sin((t / 0.5) * Math.PI / 2); R.a = Math.sin(t * 30) * 0.06 * (t / 0.5); R.fl = Math.random() < 0.3 ? 0 : rnd(0.2, 0.7); }   // stall: sputtering engine
+        else { if (!R.tumble) { R.tumble = 1; R.vy = -40; R.vx = R.x > W / 2 ? -70 : 70; R.spin = R.vx > 0 ? 7 : -7; R.fl = 0; puff(R.x, R.y + 10, 4, "90,90,100", 40); }
+          R.vy += 1050 * dt; R.y += R.vy * dt; R.x += R.vx * dt; R.a += R.spin * dt; R.fl = 0;
+          const ground = Math.min(H - 30, R.y0 + 300);
+          if (R.y > ground || t > 1.35) { R.on = false; flash = { t, c: "255,40,70", a: 0.22, d: 0.3 };
+            burst(R.x, R.y, 70, 380, ["#ff4d6d", "#ff8a3a", "#ffd0d0", "#ff2244"], 0.9, 260); puff(R.x, R.y, 12, "60,58,66", 120, 1.4);
+            rings.push({ x: R.x, y: R.y, t0: t, c: "255,77,109", R: 90 }); if (onImpact) onImpact(); } } }
+      if (kind === "sell" && R.on) { const k = Math.min(1, t / 1.05), e = 1 - Math.pow(1 - k, 3); R.y = -RH + (R.land + RH) * e; R.a = Math.sin(t * 7) * 0.03 * (1 - k);
+        R.fl = k < 1 ? rnd(0.55, 0.95) * (0.6 + 0.4 * (1 - e)) : Math.max(0, R.fl - dt * 6);
+        if (k >= 1 && !R.down) { R.down = t; const ex = exhaust(); puff(ex.x, ex.y, 12, "190,225,255", 110, 0.8); burst(ex.x, ex.y, 22, 170, ["#4da3ff", "#cfe6ff"], 0.6, 120); rings.push({ x: ex.x, y: ex.y, t0: t, c: "77,163,255", R: 60, flat: 1 }); }
+        if (R.down && t > 1.45) R.alpha = Math.max(0, 1 - (t - 1.45) / 0.4); }
+      // ---- exhaust particles ----
+      if (R.on && R.fl > 0.05) { const ex = exhaust(); const n = kind === "stop" ? 1 : 2;
+        for (let i = 0; i < n; i++) {
+          if (kind !== "sell" && (kind !== "tp" || i === 0)) add({ x: ex.x + rnd(-3, 3), y: ex.y + rnd(-2, 2), vx: rnd(-22, 22) - Math.sin(R.a) * 60, vy: rnd(30, 70) * Math.cos(R.a), drag: 0.95, life: rnd(0.45, kind === "tp" ? 0.6 : 0.85), s: rnd(3.5, 7), grow: 18, c: "190,198,214", smoke: true });
+          add({ x: ex.x, y: ex.y, vx: rnd(-70, 70), vy: rnd(60, 180) * (kind === "sell" ? 0.5 : 1), g: 220, life: rnd(0.2, kind === "sell" ? 0.3 : 0.5), s: rnd(1.1, 2.2), c: i ? "#ffd447" : RC[kind], glow: 8 }); } }
+      if (kind === "stop" && R.on && R.tumble) { add({ x: R.x + rnd(-4, 4), y: R.y + rnd(-4, 4), vx: rnd(-20, 20), vy: rnd(-30, 0), drag: 0.95, life: rnd(0.6, 1), s: rnd(5, 9), grow: 24, c: "55,52,60", smoke: true });
+        add({ x: R.x, y: R.y, vx: rnd(-150, 150), vy: rnd(-170, 30), g: 420, life: rnd(0.3, 0.6), s: rnd(1.3, 2.4), c: Math.random() < 0.5 ? "#ff4d6d" : "#ffb03a", glow: 8 }); }
+      if (R.on && (R.st = (R.st || 0) + dt) > 0.11) { R.st = 0; const a = rnd(0, Math.PI * 2), d = rnd(SZ * 0.8, SZ * 1.7);
+        add({ x: R.x + Math.cos(a) * d, y: R.y + Math.sin(a) * d * 1.2, vx: rnd(-8, 8), vy: kind === "buy" || kind === "tp" ? rnd(20, 50) : rnd(-10, 10), life: rnd(0.45, 0.75), s: rnd(3, 6), c: kind === "stop" ? "#ffb3c0" : kind === "sell" ? "#d6ecff" : Math.random() < 0.6 ? "#ffffff" : "#fff1a8", glow: 8, star: true }); }
+      // ---- draw: smoke under, rocket, sparks/rings over ----
       for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.age += dt; if (p.age > p.life) { P.splice(i, 1); continue; }
-        p.vx *= p.drag; p.vy = p.vy * p.drag + p.g * dt; const ox = p.x, oy = p.y; p.x += p.vx * dt; p.y += p.vy * dt; const k = 1 - p.age / p.life;
-        if (p.smoke) { g.fillStyle = `rgba(${p.c},${0.28 * k})`; g.beginPath(); g.arc(p.x, p.y, p.s + p.grow * (1 - k), 0, Math.PI * 2); g.fill(); continue; }
+        p.vx *= p.drag; p.vy = p.vy * p.drag + p.g * dt; p.ox = p.x; p.oy = p.y; p.x += p.vx * dt; p.y += p.vy * dt;
+        if (!p.smoke) continue; const k = 1 - p.age / p.life;
+        g.fillStyle = `rgba(${p.c},${0.3 * k})`; g.beginPath(); g.arc(p.x, p.y, p.s + p.grow * (1 - k), 0, Math.PI * 2); g.fill(); }
+      drawRocket();
+      for (const p of P) { if (p.smoke) continue; const k = 1 - p.age / p.life;
         g.globalAlpha = k; g.shadowColor = p.c; g.shadowBlur = p.glow; g.strokeStyle = g.fillStyle = p.c;
-        if (p.trail) { g.lineWidth = p.s; g.lineCap = "round"; g.beginPath(); g.moveTo(ox - p.vx * 0.03, oy - p.vy * 0.03); g.lineTo(p.x, p.y); g.stroke(); }
-        else { g.beginPath(); g.arc(p.x, p.y, p.s, 0, Math.PI * 2); g.fill(); }
-        g.globalAlpha = 1; g.shadowBlur = 0; }
+        if (p.star) { const z = p.s * Math.sin(Math.PI * (1 - k)), w = z * 0.28; g.globalAlpha = Math.min(1, 1.6 * Math.sin(Math.PI * (1 - k)));
+          g.beginPath(); g.moveTo(p.x, p.y - z); g.lineTo(p.x + w, p.y - w); g.lineTo(p.x + z, p.y); g.lineTo(p.x + w, p.y + w); g.lineTo(p.x, p.y + z); g.lineTo(p.x - w, p.y + w); g.lineTo(p.x - z, p.y); g.lineTo(p.x - w, p.y - w); g.closePath(); g.fill(); }
+        else if (p.trail) { g.lineWidth = p.s; g.lineCap = "round"; g.beginPath(); g.moveTo(p.ox - p.vx * 0.03, p.oy - p.vy * 0.03); g.lineTo(p.x, p.y); g.stroke(); }
+        else { g.beginPath(); g.arc(p.x, p.y, p.s, 0, Math.PI * 2); g.fill(); } }
+      g.globalAlpha = 1; g.shadowBlur = 0;
+      for (const rg of rings) { const k = (t - rg.t0) / 0.7; if (k < 0 || k > 1) continue; const rr = rg.R * (1 - Math.pow(1 - k, 3));
+        g.strokeStyle = `rgba(${rg.c},${1 - k})`; g.lineWidth = 6 * (1 - k) + 1; g.beginPath();
+        if (rg.flat) g.ellipse(rg.x, rg.y, rr, rr * 0.28, 0, 0, Math.PI * 2); else g.arc(rg.x, rg.y, rr, 0, Math.PI * 2); g.stroke(); }
+      if (flash && t - flash.t < flash.d) { g.fillStyle = `rgba(${flash.c},${flash.a * (1 - (t - flash.t) / flash.d)})`; g.fillRect(0, 0, W, H); }
       if (t < D / 1000) requestAnimationFrame(frame); else { clearTimeout(hard); kill(); }
     };
     requestAnimationFrame(frame);
   }
+
 
 
   function lastOrderLine(o) {

@@ -1,0 +1,32 @@
+<!-- Pump Pilot rocket, master (accent #22e584). Hand-written; app.js builds the same SVG with the accent as a parameter (green #22e584 buy/TP, red #ff4d6d stop, blue #4da3ff trail). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 220" width="100" height="220">
+<defs>
+<linearGradient id="r22e584allm" x1="0" x2="1"><stop offset="0" stop-color="#4a525f"/><stop offset=".18" stop-color="#9aa4b3"/><stop offset=".38" stop-color="#ffffff"/><stop offset=".55" stop-color="#d5dce6"/><stop offset=".8" stop-color="#7d8796"/><stop offset="1" stop-color="#3a414c"/></linearGradient>
+<linearGradient id="r22e584alla" x1="0" x2="1"><stop offset="0" stop-color="#0a4528"/><stop offset=".3" stop-color="#22e584"/><stop offset=".42" stop-color="#85f1bb"/><stop offset=".62" stop-color="#22e584"/><stop offset="1" stop-color="#0a4528"/></linearGradient>
+<linearGradient id="r22e584allf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#85f1bb"/><stop offset=".55" stop-color="#22e584"/><stop offset="1" stop-color="#137e49"/></linearGradient>
+<linearGradient id="r22e584alln" x1="0" x2="1"><stop offset="0" stop-color="#1b1f26"/><stop offset=".4" stop-color="#6c7482"/><stop offset=".6" stop-color="#3b414b"/><stop offset="1" stop-color="#121418"/></linearGradient>
+<radialGradient id="r22e584allg" cx=".38" cy=".35" r=".75"><stop offset="0" stop-color="#85f1bb"/><stop offset=".45" stop-color="#137e49"/><stop offset="1" stop-color="#05080c"/></radialGradient>
+<linearGradient id="r22e584allx" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe6"/><stop offset=".25" stop-color="#ffd447"/><stop offset=".6" stop-color="#ff7a1a"/><stop offset="1" stop-color="#ff3d00" stop-opacity="0"/></linearGradient>
+<linearGradient id="r22e584ally" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#fff1a8"/><stop offset="1" stop-color="#ffd447" stop-opacity="0"/></linearGradient>
+</defs>
+<g><path d="M31 164 C 27 186, 40 204, 50 219 C 60 204, 73 186, 69 164 Z" fill="url(#r22e584allx)" opacity=".95"/>
+<path d="M39 164 C 37 180, 45 192, 50 203 C 55 192, 63 180, 61 164 Z" fill="url(#r22e584ally)"/>
+<ellipse cx="50" cy="166" rx="15" ry="3.5" fill="#fff7d0" opacity=".9"/></g>
+<g>
+<path d="M30 104 C 14 116, 7 136, 6 162 C 13 156, 21 151, 30 148 Z" fill="url(#r22e584allf)" stroke="#0a4528" stroke-width="1"/>
+<path d="M70 104 C 86 116, 93 136, 94 162 C 87 156, 79 151, 70 148 Z" fill="url(#r22e584allf)" stroke="#0a4528" stroke-width="1"/>
+<path d="M36 148 L64 148 L70 166 L30 166 Z" fill="url(#r22e584alln)" stroke="#0b0d10" stroke-width=".8"/>
+<path d="M31 166 L69 166 L68 162 L32 162 Z" fill="#ff9a3c" opacity=".55"/>
+<path d="M50 3 C 71 27, 76 66, 74 110 L 71 149 L 29 149 L 26 110 C 24 66, 29 27, 50 3 Z" fill="url(#r22e584allm)" stroke="#2a3038" stroke-width="1"/>
+<path d="M50 3 C 64 19, 70 35, 72 50 L 28 50 C 30 35, 36 19, 50 3 Z" fill="url(#r22e584alla)"/>
+<path d="M28 50 L72 50" stroke="#1e232a" stroke-width="1.6"/><path d="M28.4 52 L71.6 52" stroke="#ffffff" stroke-opacity=".35" stroke-width=".8"/>
+<rect x="26" y="116" width="48" height="9" fill="url(#r22e584alla)"/><path d="M26 116 H74 M26 125 H74" stroke="#1e232a" stroke-width="1"/>
+<path d="M27 136 H73" stroke="#1e232a" stroke-opacity=".6" stroke-width=".8"/>
+<circle cx="50" cy="80" r="13" fill="url(#r22e584allm)" stroke="#262b33" stroke-width="1.2"/>
+<circle cx="50" cy="80" r="9.2" fill="url(#r22e584allg)" stroke="#0b0e12" stroke-width="1"/>
+<ellipse cx="46.5" cy="76.5" rx="3.6" ry="2.2" fill="#fff" opacity=".75" transform="rotate(-30 46.5 76.5)"/>
+<circle cx="61.20" cy="80.00" r=".9" fill="#2a3038"/><circle cx="55.60" cy="89.70" r=".9" fill="#2a3038"/><circle cx="44.40" cy="89.70" r=".9" fill="#2a3038"/><circle cx="38.80" cy="80.00" r=".9" fill="#2a3038"/><circle cx="44.40" cy="70.30" r=".9" fill="#2a3038"/><circle cx="55.60" cy="70.30" r=".9" fill="#2a3038"/>
+<path d="M44 22 C 36 40, 33 72, 34 140" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+<path d="M48 128 L52 128 L53.5 158 L46.5 158 Z" fill="url(#r22e584allf)" stroke="#0a4528" stroke-width=".8"/>
+</g>
+</svg>
