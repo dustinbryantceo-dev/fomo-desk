@@ -8,7 +8,7 @@ const BASE = "https://raw.githubusercontent.com/dustinbryantceo-dev/fomo-desk/da
   if (!dp) { o.textContent = "No data path on this device."; return; }
   const d = await DeskCrypto.open(dp, BASE);
   const tick = async () => {
-    try { const s = await d.get("state"); const st = s.data;
+    try { const s = await d.latest(); const st = s.state;
       o.textContent = `seq ${s.seq} · ${new Date(s.t*1000).toLocaleTimeString()} · ${st.mode} · $${st.balance} · bots ${st.bots.map(b=>b.name+":"+b.status).join(" ")} · positions ${st.positions.length}`;
     } catch (e) { o.textContent = "error: " + e.message; }
   };
