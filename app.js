@@ -49,7 +49,7 @@
     try {
       const blob = await S.desk.screen(); const url = URL.createObjectURL(blob);
       const img = new Image(); img.src = url; await img.decode();
-      const old = S.screenUrl; S.screenUrl = url; S.screenVer = v; paintScreen(); if (old) setTimeout(() => URL.revokeObjectURL(old), 2000);
+      const old = S.screenUrl; S.screenUrl = url; S.screenVer = v; paintScreen(); liveLabel(); if (old) setTimeout(() => URL.revokeObjectURL(old), 2000);
     } catch {}
   }
   function paintScreen() {
