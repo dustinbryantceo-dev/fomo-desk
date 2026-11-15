@@ -11,14 +11,19 @@ const Charts = (() => {
   const MARK = { bought: "#0a84ff", sold: "#00d35a", stopped: "#ff453a" };
 
   // Home balance chart: green line, gradient under it, dashed start line, marks above the line (rows, never overlap)
-  function line(cv, data, prev) {
-    const pts = (data && data.points) || [], start = data && data.start_value;
+  // opts (replay only): { upto: ts, t0, t1, events: [{ts, kind}] } draws the line up to `upto` with a playhead; the scale stays the full range
+  const EVC = { buy: "#00e676", tp: "#19e6c1", stop: "#ff4d6d", sell: "#2f7bff" };
+  function line(cv, data, prev, opts) {
+    const all = (data && data.points) || [], start = data && data.start_value;
     const draw = (shift) => {
       const { g, w, h } = setup(cv);
-      if (pts.length < 2) return;
+      if (all.length < 2) { if (opts) timeline(g, w, h, opts); return; }
+      let pts = all;
+      if (opts) { const i = all.findIndex((p) => p[0] > opts.upto); if (i === 0) pts = [all[0]];
+        else if (i > 0) { const a = all[i - 1], b = all[i], k = (opts.upto - a[0]) / (b[0] - a[0] || 1); pts = all.slice(0, i).concat([[opts.upto, a[1] + (b[1] - a[1]) * k]]); } }
       const top = 44, bot = 12, padX = 16;
-      const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
-      let lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1]));
+      const t0 = all[0][0], t1 = all[all.length - 1][0];
+      let lo = Math.min(...all.map((p) => p[1])), hi = Math.max(...all.map((p) => p[1]));
       if (start != null) { lo = Math.min(lo, start); hi = Math.max(hi, start); }
       if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
       const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
@@ -30,32 +35,48 @@ const Charts = (() => {
       }
       g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
       const path = new Path2D(); pts.forEach((p, i) => (i ? path.lineTo(X(p[0]), Y(p[1])) : path.moveTo(X(p[0]), Y(p[1]))));
-      const area = new Path2D(path); area.lineTo(X(t1), h); area.lineTo(X(t0), h); area.closePath();
+      const area = new Path2D(path); area.lineTo(X(pts[pts.length - 1][0]), h); area.lineTo(X(pts[0][0]), h); area.closePath();
       const gr = g.createLinearGradient(0, top, 0, h); const yl = Math.min(...pts.map((p) => Y(p[1]))); const gr2 = g.createLinearGradient(0, yl, 0, Math.min(h, yl + 120)); gr2.addColorStop(0, "rgba(0,211,90,0.22)"); gr2.addColorStop(1, "rgba(0,211,90,0)"); const grUse = gr2;
       g.fillStyle = grUse; g.fill(area);
       g.strokeStyle = "#00d35a"; g.lineWidth = 2; g.lineJoin = "round"; g.stroke(path);
       const lp = pts[pts.length - 1]; g.fillStyle = "#00d35a"; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 3.5, 0, 7); g.fill();
+      if (opts) {        // replay: playhead + a dot for every trade already played
+        const px = X(opts.upto); g.save(); g.strokeStyle = "rgba(177,140,255,.75)"; g.lineWidth = 1.5; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(px, 30); g.lineTo(px, h); g.stroke(); g.restore();
+        g.fillStyle = "#b18cff"; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 5, 0, 7); g.fill();
+        for (const e of opts.events || []) { if (e.ts > opts.upto || e.ts < t0 || e.ts > t1) continue; let vi = all.findIndex((p) => p[0] >= e.ts); if (vi < 0) vi = all.length - 1;
+          g.fillStyle = EVC[e.kind] || "#8e8e93"; g.strokeStyle = "#04090b"; g.lineWidth = 2; g.beginPath(); g.arc(X(e.ts), Y(all[vi][1]), 4.5, 0, 7); g.fill(); g.stroke(); }
+      }
       // marks: chips above the line; a later mark moves up a row when it would overlap
       g.font = "600 11px -apple-system, system-ui, sans-serif"; g.textBaseline = "middle";
       const rows = [];
       for (const m of (data.marks || [])) {
-        if (m.ts < t0 || m.ts > t1) continue;
+        if (m.ts < t0 || m.ts > t1 || (opts && m.ts > opts.upto)) continue;
         const txt = String(m.text || m.kind), tw = g.measureText(txt).width + 12, x = Math.min(Math.max(X(m.ts) - tw / 2, 2), w - tw - 2);
-        let vi = pts.findIndex((p) => p[0] >= m.ts); if (vi < 0) vi = pts.length - 1;
+        let vi = all.findIndex((p) => p[0] >= m.ts); if (vi < 0) vi = all.length - 1;
         let row = 0; while ((rows[row] || []).some(([a, b]) => x < b + 4 && x + tw > a - 4)) row++;
         (rows[row] = rows[row] || []).push([x, x + tw]);
-        const y = Math.max(10, Math.min(Y(pts[vi][1]) - 16, top - 4) - row * 20);
+        const y = Math.max(10, Math.min(Y(all[vi][1]) - 16, top - 4) - row * 20);
         g.fillStyle = MARK[m.kind] || "#8e8e93"; g.beginPath(); g.roundRect(x, y - 8, tw, 16, 8); g.fill();
         g.fillStyle = m.kind === "sold" ? "#000" : "#fff"; g.fillText(txt, x + 6, y + 0.5);
-        g.strokeStyle = g.fillStyle = MARK[m.kind] || "#8e8e93"; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(X(m.ts), y + 8); g.lineTo(X(m.ts), Y(pts[vi][1])); g.stroke(); g.globalAlpha = 1;
+        g.strokeStyle = g.fillStyle = MARK[m.kind] || "#8e8e93"; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(X(m.ts), y + 8); g.lineTo(X(m.ts), Y(all[vi][1])); g.stroke(); g.globalAlpha = 1;
       }
     };
     // a new point slides in over 250 ms
-    const grew = prev && prev.points && pts.length && prev.points.length && pts[pts.length - 1][0] > prev.points[prev.points.length - 1][0];
+    if (opts) return draw(0);
+    const grew = prev && prev.points && all.length && prev.points.length && all[all.length - 1][0] > prev.points[prev.points.length - 1][0];
     if (!grew || reduce()) return draw(0);
     const t = performance.now(), dist = 14;
     const step = (now) => { const k = Math.min(1, (now - t) / 250), e = 1 - Math.pow(1 - k, 3); draw(dist * (1 - e)); if (k < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
+  }
+
+  // replay with no balance line in the range: a plain time axis with the trades on it (no made-up values)
+  function timeline(g, w, h, o) {
+    const pad = 22, y = h * 0.6, X = (t) => pad + (w - 2 * pad) * (o.t1 === o.t0 ? 1 : (t - o.t0) / (o.t1 - o.t0));
+    g.strokeStyle = "rgba(214,234,232,.18)"; g.lineWidth = 2; g.beginPath(); g.moveTo(pad, y); g.lineTo(w - pad, y); g.stroke();
+    g.strokeStyle = "rgba(177,140,255,.9)"; g.beginPath(); g.moveTo(pad, y); g.lineTo(X(Math.min(o.upto, o.t1)), y); g.stroke();
+    for (const e of o.events || []) { if (e.ts > o.upto) continue; g.fillStyle = EVC[e.kind] || "#8e8e93"; g.beginPath(); g.arc(X(e.ts), y, 5, 0, 7); g.fill(); }
+    const px = X(Math.min(o.upto, o.t1)); g.fillStyle = "#b18cff"; g.beginPath(); g.arc(px, y, 6, 0, 7); g.fill();
   }
 
   // Coin screen: 1-minute candles from db.prices + orange dashed exit line

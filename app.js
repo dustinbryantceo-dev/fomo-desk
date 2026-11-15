@@ -75,8 +75,9 @@
   }
 
   // ---------- router ----------
-  function go(tab) { S.tab = tab; S.stack = []; document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab)); render(); scrollTo(0, 0); }
-  function push(view) { S.stack.push(view); history.pushState({ d: S.stack.length }, ""); render(); scrollTo(0, 0); }
+  function go(tab) { const moved = tab !== S.tab || S.stack.length; S.tab = tab; S.stack = []; document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab)); render(); scrollTo(0, 0); if (moved) slideIn(); }
+  function slideIn() { const v = $("#view"); if (!v || reduce()) return; v.classList.remove("vin"); void v.offsetWidth; v.classList.add("vin"); clearTimeout(slideIn.t); slideIn.t = setTimeout(() => v.classList.remove("vin"), 320); }
+  function push(view) { S.stack.push(view); history.pushState({ d: S.stack.length }, ""); render(); scrollTo(0, 0); slideIn(); }
   addEventListener("popstate", () => { if (S.stack.length) { S.stack.pop(); render(); } });
   document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => go(b.dataset.tab)));
 
@@ -132,7 +133,6 @@
       const sub = b.status === "stale" && b.age_s != null ? Math.round(b.age_s / 60) + "m" : lab;
       return `<button class="bchip ${cls}" data-act="tab" data-tab="bots" title="${esc(b.title || n)} · ${esc(b.status || "off")}"><i class="light"></i><span class="bn">${esc(b.title || n[0].toUpperCase() + n.slice(1))}</span><span class="bs">${esc(sub)}</span></button>`; }).join("")}</div>`;
   }
-  const isTrail = (r) => /trail/i.test((r.subtitle || "") + " " + (r.reason || ""));
   const isTP = (r) => r.kind === "sold" && /take ?profit|\btp\b/i.test((r.subtitle || "") + " " + (r.reason || ""));
   const tradeTag = (r) => r.kind === "bought" ? '<span class="tag buy">BUY</span>' : r.kind === "stopped" ? '<span class="tag stop">STOP</span>'
     : isTP(r) ? '<span class="tag tp">TAKE PROFIT</span>' : /trail/i.test(r.subtitle || "") ? '<span class="tag sell">TRAIL</span>' : '<span class="tag sell">SELL</span>';
@@ -177,7 +177,7 @@
       </header>
       <div id="searchbox"></div>
       <div class="home">
-        <section class="hero glass" id="hero">
+        <section class="hero glass${S.rp ? " replaying" : ""}" id="hero">
           <div class="hlab">Total balance <span class="ter">· ${esc(st.balance_source || "")}</span></div>
           <div class="balance"><span id="bal" class="tw"></span></div>
           <div class="hrow">
@@ -189,8 +189,10 @@
             <div><span>Positions</span><b>${pos.length ? money(pos.reduce((s, p) => s + (p.value_usd || 0), 0)) : "$0.00"}</b></div>
             <div><span>Open P&amp;L</span><b class="${posPnl >= 0 ? "up" : "down"}">${pos.length ? signedMoney(posPnl) : "–"}</b></div>
           </div>
-          <div class="chartbox"><canvas id="bchart"></canvas>${!chart || (chart.points || []).length < 2 ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}</div>
-          <div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>
+          <div class="chartbox"><canvas id="bchart"></canvas>${!S.rp && (!chart || (chart.points || []).length < 2) ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}
+            ${S.rp ? `<span class="rpbadge"><i></i>REPLAY <small>${esc(S.rp.range)} · ${S.rp.speed}x</small></span>` : `<button class="rpbtn" data-act="replay" aria-label="Replay this range">▶ Play</button>`}
+            ${!S.rp && S.rpMsg > Date.now() ? '<div class="rpempty">Nothing to replay in this range</div>' : ""}</div>
+          ${S.rp ? rpControls() : `<div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>`}
         </section>
         <section class="a-bots">${botStrip()}</section>
         <section class="a-pos">
@@ -215,6 +217,7 @@
           <h2 class="sec">Recent trades<button class="more" data-act="tab" data-tab="activity">See all</button></h2>
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
+        <section class="a-guide"><button class="guidecard glass" data-act="guide"><img src="icons/icon-192.png" alt=""><span class="gt"><b>How Pump Pilot works</b><span>The 5 bots, PAPER vs LIVE, stops and take profit, in one guide</span></span><span class="go">›</span></button></section>
         <section class="a-feed">
           <h2 class="sec">Live feed <span class="count">· buys, sells, skips</span></h2>
           ${a.length ? `<div class="feed glass">${a.slice(0, 12).map(feedRow).join("")}</div>` : '<div class="empty glass">Nothing yet tonight</div>'}
@@ -245,7 +248,7 @@
     const out = [], hit = new Set();
     for (const r of rows.slice().reverse()) {
       if (FX.seen.has(r.id)) continue; FX.seen.add(r.id);
-      const kind = r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : isTrail(r) ? "land" : "sell") : null;
+      const kind = r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : "sell") : null;
       if (kind) { out.push({ kind, mint: r.mint, aid: r.id }); hit.add(kind + r.mint); }
     }
     for (const [m, p] of Object.entries(pos)) {
@@ -263,7 +266,7 @@
       const targets = [...document.querySelectorAll(`.prow[data-mint="${CSS.escape(e.mint || "")}"]`), ...document.querySelectorAll(`.trow[data-aid="${CSS.escape(String(e.aid ?? "-"))}"]`)];
       const hero = $("#hero"); const all = targets.length ? targets : hero ? [hero] : [];
       if (e.kind !== "buy" && hero && !all.includes(hero)) all.push(hero);
-      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell", "fx-land"); void el.offsetWidth; el.classList.add("fx-" + e.kind); setTimeout(() => el.classList.remove("fx-" + e.kind), 2400); });
+      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + e.kind); setTimeout(() => el.classList.remove("fx-" + e.kind), 2400); });
       banner(e);
       const vis = all.find((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
       if (!calm) {
@@ -274,7 +277,7 @@
     }, i * 700));
   }
   function banner(e) {
-    const t = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Sold", land: "Trail exit" }[e.kind];
+    const t = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Exit" }[e.kind];
     const p = (S.state.positions || []).find((x) => x.mint === e.mint);
     const r = ((S.files["activity/0"] || {}).rows || []).find((x) => x.id === e.aid || (e.aid == null && x.mint === e.mint));
     const s = (p && p.symbol) || (r && (r.title || "").split(" ").slice(1).join(" ")) || (e.mint || "").slice(0, 4);
@@ -285,11 +288,11 @@
   // ---------- Pump Pilot arcade effects: one canvas overlay per effect, rAF, removed after ~2 s (fire-and-forget) ----------
   // The rocket is the SVG above, pre-rendered once per colour into an offscreen bitmap (cached), so a frame is one drawImage.
   // buy = GREEN rocket launch; tp = original teal rocket + teal firework; stop = red rocket stalls, tumbles, red fire explosion + shake;
-  // sell = RED rocket landing; land (trailing-stop exit) = BLUE rocket landing. Teal edge glow on TP, no gold anywhere.
+  // sell = any other exit (plain or trailing) = BLUE rocket landing. Teal edge glow on TP, no gold anywhere.
   // Tinted rockets are pre-rendered PNGs (only the saturated tip/fins/flame recoloured, silver body untouched): no CSS/canvas filters.
-  const RKT = {}, RC = { buy: "#00e676", tp: "#19e6c1", stop: "#ff4d6d", sell: "#ff3b4f", land: "#2f7bff" }, RC2 = { buy: "#69f0ae", tp: "#00f5a0", stop: "#ff8a8a", sell: "#ff8a8a", land: "#00c2ff" };
-  const RIMG = { buy: "rocket-green.png", tp: "rocket-real.png", stop: "rocket-red.png", sell: "rocket-red.png", land: "rocket-blue.png" };
-  const RGLOW = { buy: "105,240,174", tp: "120,220,255", stop: "255,120,120", sell: "255,110,120", land: "90,150,255" };
+  const RKT = {}, RC = { buy: "#00e676", tp: "#19e6c1", stop: "#ff4d6d", sell: "#2f7bff" }, RC2 = { buy: "#69f0ae", tp: "#00f5a0", stop: "#ff8a8a", sell: "#00c2ff" };
+  const RIMG = { buy: "rocket-green.png", tp: "rocket-real.png", stop: "rocket-red.png", sell: "rocket-blue.png" };
+  const RGLOW = { buy: "105,240,174", tp: "120,220,255", stop: "255,120,120", sell: "90,150,255" };
   function rocketSprite(kind = "tp") {
     const f = RIMG[kind] || RIMG.tp, o = RKT[f]; if (o) return o.ready ? o : null;
     const n = (RKT[f] = { ready: false }); const im = new Image();
@@ -322,7 +325,7 @@
     if (kind === "buy") { R.y = clampY(ay + 6); R.vy = -70; }
     if (kind === "tp") { R.y0 = Math.min(H - 20, r.top + r.height - 30); R.y = R.y0; R.yA = Math.max(70, r.top + 50); }
     if (kind === "stop") { R.y0 = ay; }
-    if (kind === "sell" || kind === "land") { R.y = -RH; R.land = clampY(r.top - 4) - RH * 0.3; }
+    if (kind === "sell") { R.y = -RH; R.land = clampY(r.top - 4) - RH * 0.3; }
     const exhaust = () => ({ x: R.x - Math.sin(R.a) * IMG * 0.27, y: R.y + Math.cos(R.a) * IMG * 0.27 });
     const TILT = -0.5, PX = 0.547, PY = 0.41;   // the photo points ~29 deg right of up; pivot = body centre in the image
     function drawRocket() {
@@ -359,19 +362,19 @@
           if (R.y > ground || t > 1.35) { R.on = false; flash = { t, c: "255,40,70", a: 0.4, d: 0.45 };
             burst(R.x, R.y, 70, 380, ["#ff4d6d", "#ff8a3a", "#ffd0d0", "#ff2244"], 0.9, 260); puff(R.x, R.y, 12, "60,58,66", 120, 1.4);
             rings.push({ x: R.x, y: R.y, t0: t, c: "255,77,109", R: 90 }); if (onImpact) onImpact(); } } }
-      if ((kind === "sell" || kind === "land") && R.on) { const k = Math.min(1, t / 1.05), e = 1 - Math.pow(1 - k, 3); R.y = -RH + (R.land + RH) * e; R.a = Math.sin(t * 7) * 0.03 * (1 - k);
+      if (kind === "sell" && R.on) { const k = Math.min(1, t / 1.05), e = 1 - Math.pow(1 - k, 3); R.y = -RH + (R.land + RH) * e; R.a = Math.sin(t * 7) * 0.03 * (1 - k);
         R.fl = k < 1 ? rnd(0.55, 0.95) * (0.6 + 0.4 * (1 - e)) : Math.max(0, R.fl - dt * 6);
-        if (k >= 1 && !R.down) { R.down = t; const ex = exhaust(); const red = kind === "sell"; puff(ex.x, ex.y, 12, red ? "255,200,205" : "190,225,255", 110, 0.8); burst(ex.x, ex.y, 22, 170, red ? ["#ff3b4f", "#ffc2c8"] : ["#4da3ff", "#cfe6ff"], 0.6, 120); rings.push({ x: ex.x, y: ex.y, t0: t, c: red ? "255,59,79" : "77,163,255", R: 60, flat: 1 }); }
+        if (k >= 1 && !R.down) { R.down = t; const ex = exhaust(); puff(ex.x, ex.y, 12, "190,225,255", 110, 0.8); burst(ex.x, ex.y, 22, 170, ["#4da3ff", "#cfe6ff"], 0.6, 120); rings.push({ x: ex.x, y: ex.y, t0: t, c: "77,163,255", R: 60, flat: 1 }); }
         if (R.down && t > 1.45) R.alpha = Math.max(0, 1 - (t - 1.45) / 0.4); }
       // ---- exhaust particles ----
       if (R.on && R.fl > 0.05) { const ex = exhaust(); const n = kind === "stop" ? 1 : 2;
         for (let i = 0; i < n; i++) {
-          if (kind !== "sell" && kind !== "land" && (kind !== "tp" || i === 0)) add({ x: ex.x + rnd(-3, 3), y: ex.y + rnd(-2, 2), vx: rnd(-22, 22) - Math.sin(R.a) * 60, vy: rnd(30, 70) * Math.cos(R.a), drag: 0.95, life: rnd(0.45, kind === "tp" ? 0.6 : 0.85), s: rnd(3.5, 7), grow: 18, c: "190,198,214", smoke: true });
-          add({ x: ex.x, y: ex.y, vx: rnd(-70, 70), vy: rnd(60, 180) * (kind === "sell" || kind === "land" ? 0.5 : 1), g: 220, life: rnd(0.2, kind === "sell" || kind === "land" ? 0.3 : 0.5), s: rnd(1.1, 2.2), c: i ? RC2[kind] : RC[kind], glow: 8 }); } }
+          if (kind !== "sell" && (kind !== "tp" || i === 0)) add({ x: ex.x + rnd(-3, 3), y: ex.y + rnd(-2, 2), vx: rnd(-22, 22) - Math.sin(R.a) * 60, vy: rnd(30, 70) * Math.cos(R.a), drag: 0.95, life: rnd(0.45, kind === "tp" ? 0.6 : 0.85), s: rnd(3.5, 7), grow: 18, c: "190,198,214", smoke: true });
+          add({ x: ex.x, y: ex.y, vx: rnd(-70, 70), vy: rnd(60, 180) * (kind === "sell" ? 0.5 : 1), g: 220, life: rnd(0.2, kind === "sell" ? 0.3 : 0.5), s: rnd(1.1, 2.2), c: i ? RC2[kind] : RC[kind], glow: 8 }); } }
       if (kind === "stop" && R.on && R.tumble) { add({ x: R.x + rnd(-4, 4), y: R.y + rnd(-4, 4), vx: rnd(-20, 20), vy: rnd(-30, 0), drag: 0.95, life: rnd(0.6, 1), s: rnd(5, 9), grow: 24, c: "55,52,60", smoke: true });
         add({ x: R.x, y: R.y, vx: rnd(-150, 150), vy: rnd(-170, 30), g: 420, life: rnd(0.3, 0.6), s: rnd(1.3, 2.4), c: Math.random() < 0.5 ? "#ff4d6d" : "#ffb03a", glow: 8 }); }
       if (R.on && (R.st = (R.st || 0) + dt) > 0.11) { R.st = 0; const a = rnd(0, Math.PI * 2), d = rnd(SZ * 0.8, SZ * 1.7);
-        add({ x: R.x + Math.cos(a) * d, y: R.y + Math.sin(a) * d * 1.2, vx: rnd(-8, 8), vy: kind === "buy" || kind === "tp" ? rnd(20, 50) : rnd(-10, 10), life: rnd(0.45, 0.75), s: rnd(3, 6), c: Math.random() < 0.6 ? "#ffffff" : { stop: "#ffb3c0", tp: "#7dffe3", buy: "#b9f6ca", sell: "#ffb3bb", land: "#9fdcff" }[kind], glow: 8, star: true }); }
+        add({ x: R.x + Math.cos(a) * d, y: R.y + Math.sin(a) * d * 1.2, vx: rnd(-8, 8), vy: kind === "buy" || kind === "tp" ? rnd(20, 50) : rnd(-10, 10), life: rnd(0.45, 0.75), s: rnd(3, 6), c: Math.random() < 0.6 ? "#ffffff" : { stop: "#ffb3c0", tp: "#7dffe3", buy: "#b9f6ca", sell: "#9fdcff" }[kind], glow: 8, star: true }); }
       // ---- draw: smoke under, rocket, sparks/rings over ----
       for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.age += dt; if (p.age > p.life) { P.splice(i, 1); continue; }
         p.vx *= p.drag; p.vy = p.vy * p.drag + p.g * dt; p.ox = p.x; p.oy = p.y; p.x += p.vx * dt; p.y += p.vy * dt;
@@ -531,7 +534,8 @@
         ${fomoLink(ac.profile_url) ? `<a class="row" href="${esc(ac.profile_url)}" target="_blank" rel="noopener noreferrer"><div class="tx"><div class="t1">Your FOMO profile</div><div class="t2">@${esc(ac.fomo_handle)}</div></div><span class="ter">›</span></a>` : ""}
         ${fomoLink(ac.invite_url) ? `<button class="row" data-act="invite" style="width:100%;text-align:left"><div class="tx"><div class="t1">Invite a friend</div><div class="t2">Share your FOMO invite link</div></div><span class="ter">›</span></button>` : ""}
       </div>
-      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop, sell and trail exit on Home · no trade</div></div><span class="ter">›</span></button></div>
+      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
+      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
       <div class="grp">Pushes</div><div class="list plain">
         <div class="row"><div class="tx"><div class="t1">Telegram</div><div class="t2">${ac.pushes && ac.pushes.telegram ? "connected" : "not connected yet (STEP 11)"}</div></div></div>
@@ -598,7 +602,7 @@
   function after() {
     const bal = $("#bal");
     if (bal && S.state) tween(bal, S.state.balance);
-    const bc = $("#bchart"); if (bc) { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; }
+    const bc = $("#bchart"); if (bc) { if (S.rp) rpDraw(); else { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; } }
     const top = S.stack[S.stack.length - 1];
     const cc = $("#cchart"); if (cc && top) { const c = S.files["coin/" + top.mint]; if (c) Charts.candles(cc, c.candles, c.exit_line, c.position && c.position.entry_price); }
     document.querySelectorAll(".disc .d").forEach((d) => requestAnimationFrame(() => d.classList.add(d.dataset.st)));
@@ -624,6 +628,11 @@
     else if (act === "closesheet") $("#sheet").hidden = true;
     else if (act === "fxdemo") fxDemo();
     else if (act === "mode") openMode(t.dataset.m);
+    else if (act === "replay") rpStart();
+    else if (act === "rpplay") rpToggle();
+    else if (act === "rpexit") rpExit();
+    else if (act === "rpspeed") { if (S.rp) { S.rp.speed = +t.dataset.s; render(); } }
+    else if (act === "guide") openGuide();
   });
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 1800); }
   async function invite() {
@@ -706,6 +715,86 @@
     document.body.appendChild(d);
   }
 
+  // ---------- balance replay: plays the trades of the selected range on the chart with their rocket effects ----------
+  // Local only: reads activity pages that are already published (no writes, nothing sent to the desk), runs on rAF, the 15 s poll is untouched.
+  const RP_WIN = { LIVE: 3600, "1H": 3600, "4H": 4 * 3600, "1D": 86400, "1W": 7 * 86400 }, RP_1X = 24;   // whole range in 24 s at 1x
+  const SPEEDS = [0.5, 1, 2, 4, 8];
+  const rowKind = (r) => r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : "sell") : null;
+  const rpWhen = (ts, span) => new Date(ts * 1000).toLocaleString([], span > 86400 ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  function rpControls() {
+    const r = S.rp, n = r.events.filter((e) => e.fired).length;
+    return `<div class="rpctl"><button class="rb" data-act="rpplay" id="rpPlay">${r.done ? "↻ Again" : r.playing ? "❚❚ Pause" : "▶ Play"}</button><button class="rb exit" data-act="rpexit">■ Exit</button>
+      <div class="spd" role="group" aria-label="Speed">${SPEEDS.map((x) => `<button data-act="rpspeed" data-s="${x}" class="${x === r.speed ? "on" : ""}">${x}x</button>`).join("")}</div></div>
+      <div class="rpinfo"><span id="rpTime">${esc(rpWhen(r.pos, r.t1 - r.t0))}</span><span id="rpCount"><b>${n}</b> of ${r.events.length} trades · not live</span></div>`;
+  }
+  async function rpStart() {
+    if (S.rp || !S.state) return;
+    const range = S.range, chart = S.files["chart/" + range], pts = (chart && chart.points) || [], now = Date.now() / 1000;
+    let t0 = pts.length >= 2 ? pts[0][0] : range === "ALL" ? null : now - RP_WIN[range], t1 = pts.length >= 2 ? pts[pts.length - 1][0] : now;
+    for (let i = 0; i < 10; i++) {                       // published activity pages, newest first; stop once we are older than the range
+      if (!S.files["activity/" + i]) { if (!S.ix || !S.ix.files["activity/" + i]) break; try { await getFile("activity/" + i); } catch { break; } }
+      const rows = (S.files["activity/" + i] || {}).rows || []; if (!rows.length || (t0 != null && rows[rows.length - 1].ts < t0)) break;
+    }
+    const rows = []; for (let i = 0; i < 10 && S.files["activity/" + i]; i++) rows.push(...(S.files["activity/" + i].rows || []));
+    let ev = rows.map((r) => ({ r, kind: rowKind(r) })).filter((x) => x.kind && x.r.ts);
+    if (t0 == null) t0 = ev.length ? Math.min(...ev.map((x) => x.r.ts)) - 60 : now - 86400;
+    ev = ev.filter((x) => x.r.ts >= t0 && x.r.ts <= t1).sort((a, b) => a.r.ts - b.r.ts)
+      .map(({ r, kind }) => ({ ts: r.ts, kind, mint: r.mint, id: r.id, sym: (r.title || "").split(" ").slice(1).join(" ") || (r.mint || "").slice(0, 4), value: String(r.value || "").split(" · ")[0] }));
+    if (!ev.length || t1 - t0 < 1) { S.rpMsg = Date.now() + 2600; render(); setTimeout(() => { if (!S.rp) render(); }, 2700); return; }
+    S.rp = { range, chart, t0, t1, events: ev, pos: t0, speed: 1, playing: true, done: false, last: 0 };
+    render(); rpLoop();
+  }
+  function rpLoop() {
+    const r = S.rp; if (!r || r.raf) return;
+    const step = (now) => {
+      r.raf = 0; if (S.rp !== r) return;
+      if (S.tab !== "home" || S.stack.length) { rpExit(); return; }
+      if (r.playing) {
+        const dt = r.last ? Math.min(0.1, (now - r.last) / 1000) : 0; r.last = now;
+        r.pos = Math.min(r.t1, r.pos + dt * (r.t1 - r.t0) / RP_1X * r.speed);
+        let n = 0; for (const e of r.events) if (!e.fired && e.ts <= r.pos) { e.fired = true; if (n++ < 2) rpFire(e); }   // at 8x skip the pile-up, never queue
+        if (r.pos >= r.t1) { r.playing = false; r.done = true; render(); return; }
+      }
+      rpDraw();
+      const tEl = $("#rpTime"); if (tEl) tEl.textContent = rpWhen(r.pos, r.t1 - r.t0);
+      const cEl = $("#rpCount b"); if (cEl) cEl.textContent = r.events.filter((e) => e.fired).length;
+      if (r.playing) r.raf = requestAnimationFrame(step);
+    };
+    r.last = 0; r.raf = requestAnimationFrame(step);
+  }
+  function rpDraw() { const r = S.rp, bc = $("#bchart"); if (r && bc) Charts.line(bc, r.chart, null, { upto: r.pos, t0: r.t0, t1: r.t1, events: r.events }); }
+  function rpToggle() {
+    const r = S.rp; if (!r) return;
+    if (r.done) { r.events.forEach((e) => (e.fired = false)); r.pos = r.t0; r.done = false; r.playing = true; }
+    else r.playing = !r.playing;
+    render(); if (r.playing) rpLoop();
+  }
+  function rpExit() { const r = S.rp; if (!r) return; if (r.raf) cancelAnimationFrame(r.raf); S.rp = null; render(); }
+  function rpFire(e) {
+    const bc = $("#bchart"), hero = $("#hero"); if (!bc) return;
+    const cr = bc.getBoundingClientRect(), pts = (S.rp.chart && S.rp.chart.points) || [], pad = pts.length >= 2 ? 16 : 22;
+    const x = cr.left + pad + (cr.width - 2 * pad) * ((e.ts - S.rp.t0) / (S.rp.t1 - S.rp.t0 || 1)), y = cr.top + cr.height * 0.55;
+    const anchor = { getBoundingClientRect: () => e.kind === "tp" ? { left: x - 50, top: y - 100, width: 100, height: 130 } : { left: x, top: y - 10, width: 0, height: 20 } };
+    if (hero) { hero.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void hero.offsetWidth; hero.classList.add("fx-" + e.kind); setTimeout(() => hero.classList.remove("fx-" + e.kind), 1600); }
+    const lab = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Exit" }[e.kind];
+    const el = document.createElement("div"); el.className = "ppban replay " + e.kind;
+    el.innerHTML = `<em>REPLAY</em><b>${esc(lab)}</b> ${esc(e.sym)}${e.value ? ` <span>${esc(e.value)}</span>` : ""}`;
+    document.querySelectorAll(".ppban.replay").forEach((b) => b.remove());
+    document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 1500); setTimeout(() => el.remove(), 2100);
+    if (!reduce()) { const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
+      arcade(e.kind, anchor, e.kind === "stop" ? shake : null); }
+  }
+
+  // ---------- guide: guide.html from the same site in a full-screen view (Close returns to the app) ----------
+  function openGuide() {
+    if ($("#guidev")) return;
+    const d = document.createElement("div"); d.id = "guidev"; d.className = "guidev";
+    d.innerHTML = `<div class="gbar"><button data-gclose>✕ Close</button><b>How Pump Pilot works</b><a href="guide.html" target="_blank" rel="noopener">Open ↗</a></div><iframe src="guide.html" title="Pump Pilot guide"></iframe>`;
+    d.querySelector("[data-gclose]").onclick = () => { d.remove(); if (history.state && history.state.guide) history.back(); };
+    document.body.appendChild(d); history.pushState({ d: S.stack.length, guide: 1 }, "");
+  }
+  addEventListener("popstate", () => { const g = $("#guidev"); if (g) g.remove(); });
+
   // ---------- effects preview (#fx=demo or Account > Replay effects): local only, no data written, no calls to the desk ----------
   // Plays buy -> take profit -> stop -> trail on Home, 2.5 s apart, over one clearly fake sample row that only exists in the DOM.
   const fxFlag = () => /[#&]fx=demo\b/.test(location.hash);
@@ -714,7 +803,7 @@
     const h = location.hash.slice(1).split("&").filter((x) => x && x !== "fx=demo").join("&");
     history.replaceState(history.state, "", location.pathname + location.search + (h ? "#" + h : ""));
   }
-  const DEMO = { buy: ["Buy", "green rocket launch"], tp: ["Take profit", "firework"], stop: ["Stop loss", "crash"], sell: ["Sell", "red rocket landing"], land: ["Trail exit", "blue rocket landing"] };
+  const DEMO = { buy: ["Buy", "green rocket launch"], tp: ["Take profit", "firework"], stop: ["Stop loss", "crash"], sell: ["Exit", "blue rocket landing"] };
   const demoRow = () => `<div class="prow gain demo" id="demorow"><div class="pic">★</div>
       <div class="ptx"><div class="psym">SAMPLE <span class="tag demo">PREVIEW</span></div><div class="psub">Not a real position · no trade</div></div>
       <div class="ppl"><div class="pval">$0.00</div><div class="pchg mut">effects demo</div></div></div>`;
@@ -725,18 +814,18 @@
     const calm = reduce();
     if (!calm) { for (let i = 0; i < 20 && !warmRockets(); i++) await new Promise((r) => setTimeout(r, 100)); }
     const row0 = $("#demorow"); if (row0) row0.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
-    ["buy", "tp", "stop", "sell", "land"].forEach((k, i) => setTimeout(() => {
+    ["buy", "tp", "stop", "sell"].forEach((k, i) => setTimeout(() => {
       if (S.tab !== "home" || S.stack.length) return;            // left Home: skip the rest quietly
       const row = $("#demorow"), hero = $("#hero");
       const els = k === "tp" ? [row, hero] : k === "stop" ? [row, hero] : [row];
-      els.filter(Boolean).forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell", "fx-land"); void el.offsetWidth; el.classList.add("fx-" + k); setTimeout(() => el.classList.remove("fx-" + k), 2300); });
+      els.filter(Boolean).forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + k); setTimeout(() => el.classList.remove("fx-" + k), 2300); });
       demoBanner("PREVIEW · no trade", calm ? DEMO[k][0] + " · reduced motion is on, outline only" : DEMO[k].join(" · "), k);
       if (!calm) {
         const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
         arcade(k, k === "tp" ? hero || row : row || hero, k === "stop" ? shake : null);
       }
     }, 300 + i * 2500));
-    setTimeout(() => { S.demo = false; render(); }, 300 + 5 * 2500 + 300);
+    setTimeout(() => { S.demo = false; render(); }, 300 + 4 * 2500 + 300);
   }
   function demoBanner(t, sub, kind) {
     const el = document.createElement("div"); el.className = "ppban demo " + kind;
