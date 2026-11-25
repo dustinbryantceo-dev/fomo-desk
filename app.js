@@ -1497,7 +1497,8 @@
     window: ["Trading window", "Window turned on / off, hours changed"],
     starship: ["🚀 Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["🚀 Starship trades", "Each Starship buy, take profit and exit"],
     viewer: ["👀 Viewer link", "Created, revoked, first opened"],
-    skips: ["🔎 Skip summary", "Top skip reasons, every 3 h (only if coins were skipped)"] };
+    skips: ["🔎 Skip summary", "Top skip reasons, every 3 h (only if coins were skipped)"],
+    health: ["🩺 Morning health check", "09:35, only if something is wrong (not LIVE, bot paused, no coins to Brain, memory)"] };
   const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const PF = () => window.__PUSH_FAKE || null;          // screenshot tests only (Playwright); never set in the real app
   function pushEnv() {
