@@ -437,7 +437,17 @@
     const st = `<span class="sdot ${esc(b.status || "off")}"></span>`;
     let body = "";
     if (b.name === "scanner") {
-      body = `<div class="big">${b.pools ?? 0} pools</div>` + (b.feed || []).slice(0, full ? 8 : 3).map((f) => f.verdict === "kill"
+      const FEED_LAB = {migration:"migrate", x_trend:"X", jup_recent:"Jupiter", launchlab:"LaunchLab", near_grad:"near-grad"};
+      const feedOrder = ["migration","x_trend","jup_recent","launchlab","near_grad"];
+      const feeds = b.feeds || {};
+      const feedKeys = feedOrder.filter((k) => k in feeds).concat(Object.keys(feeds).filter((k) => !feedOrder.includes(k)));
+      const feedBits = feedKeys.map((k) => {
+        const v = feeds[k], n = v && typeof v === "object" ? `${v.admitted ?? 0}/${v.seen ?? 0}` : v;
+        const sum = v && typeof v === "object" ? (v.seen||0)+(v.admitted||0)+(v.flagged||0) : v;
+        return sum ? `${FEED_LAB[k] || k} ${n}` : null;
+      }).filter(Boolean);
+      const feedLine = feedBits.length ? `<div class="line mut">${feedBits.join(" · ")}</div>` : "";
+      body = `<div class="big">${b.pools ?? 0} pools</div>` + feedLine + (b.feed || []).slice(0, full ? 8 : 3).map((f) => f.verdict === "kill"
         ? `<div class="line"><span class="killed trunc">${sym(f.symbol, f.mint)}</span><span class="trunc">${esc(f.reason || "")}</span></div>`
         : `<div class="line"><span class="trunc">${sym(f.symbol, f.mint)}</span><span class="r" style="color:#ffd60a">→ Analyst</span></div>`).join("") || '<div class="line">No pools yet tonight</div>';
     } else if (b.name === "analyst") {
