@@ -327,7 +327,7 @@
   // ---------- Yobel: home ----------
   // LOGO SWAP: Dustin's own logo is pending. Until then the header shows the plain gold YOBEL wordmark (text, no mark).
   // To use his logo: drop the file as icons/logo.svg (or .png), set MARK_SRC = "icons/logo.svg" and replace the PWA icons (same names) in icons/.
-  const MARK_SRC = null;
+  const MARK_SRC = "icons/mark.webp";
   const LOGO = MARK_SRC ? `<img src="${MARK_SRC}" class="pplogo" alt="Yobel">` : "";
   const STAR = (window.Yobel && Yobel.STAR) || "\u2726";
   const yoTag = () => (window.Yobel ? Yobel.tagline() : "late night grind");
@@ -409,7 +409,7 @@
           <div class="hlab">Total balance <span class="ter">· ${esc(st.balance_source || "")}</span><span class="lvchip off" data-lvchip></span></div>
           <div class="balance"><span id="bal" class="tw"></span></div>
           <div class="hrow">
-            ${H.pct != null ? `<span class="chg ${up ? "up" : "down"}" id="hchg">${heroChg(H)}</span><span class="mut">vs night start</span>` : '<span class="mut">No night start yet</span>'}
+            ${H.pct != null ? `<span class="chg ${up ? "up" : "down"}" id="hchg">${heroChg(H)}</span><span class="mut" id="hsince">${sinceNight()}</span>` : '<span class="mut">Waiting for the first balance reading</span>'}
             ${H.mult != null ? `<span class="pill mult" id="hmult">${H.mult.toFixed(2)}×</span>` : ""}
           </div>
           <div class="hstats">
@@ -420,6 +420,7 @@
           <div class="chartbox"><canvas id="bchart"></canvas>${(!chart || (chart.points || []).length < 2) ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}
             <button class="rpbtn" data-act="replay" aria-label="Replay trades">▶ Replay</button></div>
           <div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>
+          ${balTrades(chart)}
         </section>
         <section class="a-bots">${botStrip()}</section>
         <section class="a-pos">
@@ -446,7 +447,7 @@
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
         <section class="a-xtr">${xTrendsCard()}</section>
-        <section class="a-guide"><button class="guidecard glass" data-act="guide"><span class="ymark" aria-hidden="true">✦</span><span class="gt"><b>Yobel — how it works</b><span>The 5 bots, safety rules and Starship, in plain English</span></span><span class="go">›</span></button></section>
+        <section class="a-guide"><button class="guidecard glass" data-act="guide"><img src="icons/icon-192.png" alt=""><span class="gt"><b>Yobel — how it works</b><span>The 5 bots, safety rules and Starship, in plain English</span></span><span class="go">›</span></button></section>
         <section class="a-feed">
           <h2 class="sec">Live feed <span class="count">· buys, sells, skips</span></h2>
           ${a.length ? `<div class="feed glass">${a.slice(0, 12).map(feedRow).join("")}</div>` : '<div class="empty glass">Nothing yet tonight</div>'}
@@ -669,6 +670,28 @@
       <div class="trchips">${chip("all", "All", all.length)}${chip("wins", "Wins", wins.length)}${chip("losses", "Losses", loss.length)}</div>${body}
       <button class="loadmore trlog" data-act="actlog">Full activity log</button>`;
   }
+  // ---- Total balance card (MEM-26): the finished trades behind the balance, each one taps straight into its Replay
+  const nightFmt = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Berlin", hour: "numeric", minute: "2-digit", hour12: true });
+  // what the green/red change under the balance really measures (api.py _night_start_value): balance now minus the balance at the
+  // first reading after the last night_start (22:00 desk time), or the $100 paper start cash if there is no reading yet
+  function sinceNight() {
+    const ch = S.files["chart/LIVE"] || S.files["chart/" + S.range] || S.files["chart/1D"] || {}, ns = ch.night_start, now = Date.now() / 1000;
+    return ns && now - ns < 90000 ? "since " + nightFmt.format(new Date(ns * 1000)).replace(/\u202f/g, " ") : "since tonight's start";
+  }
+  function balTrades(chart) {
+    const ix = S.files["replay/index"]; if (!ix || !ix.trades) return "";
+    const t0 = chart && chart.points && chart.points.length ? chart.points[0][0] : 0;
+    const all = ix.trades.filter((t) => t.t_close && t.pnl_usd != null && isFinite(t.pnl_usd) && t.t_close >= t0).sort((a, b) => b.t_close - a.t_close);
+    const head = (n, net) => `<div class="hbth"><b>Trades behind this balance</b>${n ? `<span class="${net >= 0 ? "up" : "down"}">${n} · ${trSigned(net)}</span>` : ""}</div>`;
+    if (!all.length) return `<div class="hbt">${head(0, 0)}<div class="hbtn">No finished trades in this view yet. Pick a longer range to see more.</div></div>`;
+    const net = all.reduce((x, t) => x + t.pnl_usd, 0);
+    const row = (t) => { const up = t.pnl_usd >= 0, sy = t.symbol || String(t.mint || "").slice(0, 4);
+      return `<button class="hbtr" data-act="rpid" data-id="${t.id}" aria-label="Replay ${esc(sy)}"><span class="ic" style="color:${up ? "#ff9752" : "#ff5c7a"}">${esc(sy.slice(0, 1))}</span>
+        <span class="tx"><span class="t1">${esc(sy)}${t.starship ? ` <span class="tag ss">${STAR}</span>` : ""}</span><span class="t2">${trWhen.format(new Date(t.t_close * 1000))} · held ${trDur(t.t_close - t.t_open)}</span></span>
+        <span class="rv"><b class="${up ? "up" : "down"}">${trSigned(t.pnl_usd)}</b><small class="go">▶ Replay</small></span></button>`; };
+    return `<div class="hbt">${head(all.length, net)}<div class="hbtl">${all.slice(0, 5).map(row).join("")}</div>
+      <div class="hbtf"><button data-act="replay">▶ Replay a whole night</button><button data-act="tab" data-tab="activity">${all.length > 5 ? `All ${all.length} trades ›` : "Trades tab ›"}</button></div></div>`;
+  }
   function viewActivity() {
     const pages = []; for (let i = 0; i < 10 && S.files["activity/" + i]; i++) pages.push(S.files["activity/" + i]);
     const rows = pages.flatMap((p) => p.rows), more = pages.length && pages[pages.length - 1].next_before;
@@ -803,7 +826,7 @@
         <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
       </div>` : ""}
       ${S.tg ? `<div class="grp">Home Screen</div>${tgHomeRow()}` : ""}
-      <div class="yoabout"><div class="yh"><span class="ymark" aria-hidden="true">✦</span><div><b>Yobel</b><div class="yt">Jubilee · the year debts were cancelled</div></div></div>
+      <div class="yoabout"><div class="yh"><img src="icons/icon-192.png" alt=""><div><b>Yobel</b><div class="yt">Jubilee · the year debts were cancelled</div></div></div>
         <p>Yobel is Hebrew for Jubilee: the year debts were cancelled and people went free, announced with the blast of a ram's horn, the shofar. This desk is for the late-night, early-morning grinder making something out of nothing. When a trade closes in profit, the horn sounds.</p></div>
       <div class="grp">Sound</div><div class="list plain"><button class="row" data-act="yosound" style="width:100%;text-align:left"><div class="tx"><div class="t1">Shofar on a win</div><div class="t2">A soft horn when a trade closes in profit · off by default</div></div><span class="switch ${window.Yobel && Yobel.soundOn() ? "on" : ""}"></span></button></div>
       <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">Yobel — how it works</div><div class="t2">The 5 bots, safety rules and Starship, in plain English</div></div><span class="ter">›</span></button></div>
@@ -952,6 +975,7 @@
     else if (act === "mode") openMode(t.dataset.m);
     else if (act === "replay") Replay.open();
     else if (act === "rptrade") Replay.open({ mint: t.dataset.mint });
+    else if (act === "rpid") Replay.open({ id: Number(t.dataset.id) });
     else if (act === "guide") openGuide();
   });
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.remove("out"); el.hidden = false; el.onclick = () => { el.hidden = true; }; clearTimeout(toast.t); clearTimeout(toast.u); const ms = Math.max(2200, Math.min(6000, 1400 + String(msg).length * 55)); toast.t = setTimeout(() => { el.classList.add("out"); toast.u = setTimeout(() => { el.hidden = true; el.classList.remove("out"); }, 400); }, ms); }
@@ -1176,7 +1200,7 @@
           <button class="sw ${w.enabled ? "on" : ""}" data-act="wtoggle" aria-pressed="${!!w.enabled}" aria-label="Trading window"><i></i></button></div>
         <div class="row qrow"><label>From <input type="time" id="wa" value="${esc(w.start)}"></label><label>to <input type="time" id="wb" value="${esc(w.end)}"></label><button class="btn sm" data-act="wsave">Save</button></div></div>
       <div class="p2note">Hours are <b>Rome time</b> (the server runs UTC; summer/winter time is handled). ${w.enabled ? `With the window ON the desk <b>sells every open position at ${esc(w.end)}</b>.` : "Saving hours doesn't turn the window on."}</div>
-      <div class="ro" style="margin-top:14px">Sells, stops and take profits always run; timers and the window only stop <b>new</b> buys. A risk stop (night loss, FOMO logged out) always wins.<br>Telegram: /window · /window hours 22-06 · /pausebuys 2h · /buysfor 3h · /stopbuys 23:30 · /canceltimer</div>`;
+      <div class="ro" style="margin-top:14px">Sells, stops and take profits always run; timers and the window only stop <b>new</b> buys. A risk stop (the night loss limit, or FOMO logged out) always wins.<br>Telegram: /window · /window hours 22-06 · /pausebuys 2h · /buysfor 3h · /stopbuys 23:30 · /canceltimer</div>`;
   }
   function winTick() {
     document.querySelectorAll("[data-cd]").forEach((el) => {
@@ -1446,7 +1470,7 @@
       ${live ? `<div class="mrows">
           <div><span>Per buy</span><b>${rp != null ? esc(rp) + "% of cash" : "–"}${mn != null && mx != null ? ` · ${money(+mn)}–${money(+mx)}` : ""}</b></div>
           <div><span>Stop per trade</span><b>${sp != null ? "-" + esc(sp) + "%" : "–"}</b></div>
-          <div><span>Nightly loss cap</span><b>${nl != null ? "buys stop at -" + esc(nl) + "%" : "–"}${nl != null && nsb ? ` (≈ ${money(nsb * (1 - nl / 100))})` : ""}</b></div>
+          <div><span>Loss limit for the night</span><b>${nl != null ? "new buys pause at -" + esc(nl) + "%" : "–"}${nl != null && nsb ? ` (≈ ${money(nsb * (1 - nl / 100))})` : ""}</b></div>
           <div><span>First live buy</span><b>60 s after the switch</b></div></div>
         <div class="ro" style="margin:10px 0 6px">LIVE trades real money. The desk refuses unless you unlocked LIVE on the server yourself.</div>
         <input id="livein" class="livein" placeholder="Type LIVE" autocomplete="off" autocapitalize="characters" spellcheck="false">`
@@ -1712,7 +1736,8 @@
     if (!inTelegram()) return;
     const w = await loadTelegram(); if (!w || !w.initData) return;
     S.tg = w; document.documentElement.classList.add("tg");
-    try { w.ready(); w.expand(); w.setHeaderColor("#0f0c08"); w.setBackgroundColor("#0b0906"); if (w.setBottomBarColor) w.setBottomBarColor("#0b0906"); } catch {}
+    try { w.ready(); } catch {}
+    if (window.Yobel && Yobel.tgSetup) Yobel.tgSetup(w); else { try { w.expand(); } catch {} }
     const tp = w.themeParams || {}; if (tp.link_color) document.documentElement.style.setProperty("--tg-link", tp.link_color);   // light touch: links only, our dark-teal stays
     try { w.BackButton.onClick(() => history.back()); } catch {}
     if (!DeskCrypto.dataPath()) {      // the webview has no #d= link: the desk hands the data key to a validated initData session (memory only)

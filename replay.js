@@ -140,11 +140,14 @@ const Replay = (() => {
       <div class="rppad"></div></div>`;
     wire(); R.lastStep = -2; play(true);
   }
-  function openWindow(wid, from) {
+  async function openWindow(wid, from) {
     const w = windows(R.trades).find((x) => x.id === wid); if (!w) return;
+    R.view = "winload"; root.innerHTML = bar(w.title, "", "back") + `<div class="rpscroll"><div class="rpload"><i></i>Loading the balance line…</div></div>`;
+    await Promise.allSettled([B.getFile(w.t1 - w.t0 <= 86400 ? "chart/1D" : "chart/1W"), B.getFile("chart/ALL")]);
+    if (!root || R.view !== "winload") return;      // the user went back meanwhile
     const trades = R.trades.filter((t) => t.t_open >= w.t0 && t.t_open <= w.t1).sort((a, b) => a.t_open - b.t_open);
-    const span = w.t1 - w.t0, ch = B.S.files[span <= 86400 ? "chart/1D" : "chart/1W"] || B.S.files["chart/ALL"] || {};
-    let pts = ((ch.points) || []).filter((p) => p[0] >= w.t0 - 600);
+    const span = w.t1 - w.t0, ch = B.S.files[span <= 86400 ? "chart/1D" : "chart/1W"] || {}, inWin = (c) => ((c && c.points) || []).filter((p) => p[0] >= w.t0 - 600);
+    let pts = inWin(ch); if (pts.length < 2) pts = inWin(B.S.files["chart/ALL"]);
     R = Object.assign(R, { view: "window", W: w, trades, playing: false }); R.from = from || null;
     if (pts.length < 2) { root.innerHTML = bar(w.title, "", "back") + `<div class="rpscroll"><div class="rpempty2"><b>No balance history here yet</b>The balance line for this window isn't published yet.</div></div>`; return; }
     const start = pts[0][1]; R.pts = pts; R.sumOn = false; R.start = start; R.t0 = Math.max(w.t0, pts[0][0]); R.t1 = pts[pts.length - 1][0]; R.pos = R.t0;

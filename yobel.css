@@ -213,3 +213,26 @@ html.yo-fs .yo-fsbtn{color:var(--gold)}
 /* ===== notices fade out; tap/swipe closes them early ===== */
 .maint,.toast{transition:opacity .4s ease}.maint.out,.toast.out{opacity:0}
 .maint,.toast,.ppban{cursor:pointer}
+/* ===== MEM-26: trades behind the balance, header logo, Telegram full screen ===== */
+.pplogo{width:40px!important;height:40px!important;border-radius:11px!important;object-fit:cover;background:#030201;box-shadow:0 0 0 1px rgba(245,199,107,.38),0 0 14px rgba(245,170,50,.22)!important}
+.hbt{margin-top:14px;padding-top:12px;border-top:1px solid rgba(245,199,107,.14)}
+.hbth{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.hbth b{font-size:13px;font-weight:650;letter-spacing:.02em;color:var(--txt,#f7f0e2)}
+.hbth span{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.hbtn{padding:10px 0 4px;color:var(--mut,#b8ab93);font-size:14px}
+.hbtr{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:8px 2px;border-top:1px solid rgba(245,199,107,.08);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hbtr:first-child{border-top:0}
+.hbtr .ic{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:rgba(245,199,107,.08);border:1px solid rgba(245,199,107,.2);font-weight:700}
+.hbtr .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hbtr .t1{font-weight:650;font-size:15px}.hbtr .t2{font-size:12.5px;color:var(--mut,#b8ab93)}
+.hbtr .rv{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.hbtr .rv b{font:700 15px ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.hbtr .go{font-size:11.5px;color:var(--gold,#f5c76b);opacity:.85}
+.hbtr:active{background:rgba(245,199,107,.06)}
+@media (hover:hover){.hbtr:hover{background:rgba(245,199,107,.05)}}
+.hbtf{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
+.hbtf button{all:unset;cursor:pointer;color:var(--gold,#f5c76b);font-size:13.5px;font-weight:600;padding:8px 2px;min-height:32px;-webkit-tap-highlight-color:transparent}
+html.tg{background:#000000}
+html.tg-fs .yo-fsbtn{color:var(--gold)}
+/* the notch / Telegram safe area: when the offline strip is hidden the view must still clear it (the old rule only did so while offline was shown) */
+.offline[hidden] + #view{padding-top:calc(var(--st) + 8px)}

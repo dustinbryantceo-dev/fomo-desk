@@ -164,8 +164,38 @@ const Yobel = (() => {
   const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
   const fsApi = () => { const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen); };
   const standalone = () => matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || navigator.standalone === true;
-  const fsShow = () => fsApi() || !standalone();                       // an installed iPhone app is already full screen: no button
+  // ---------- Telegram Mini App (Bot API 8.0+): real full screen, no swipe-to-close, black chrome, safe-area insets ----------
+  let TG = null;
+  const tgVer = (v) => { try { return !!(TG && TG.isVersionAtLeast && TG.isVersionAtLeast(v)); } catch { return false; } };
+  const tgFsOk = () => tgVer("8.0") && typeof TG.requestFullscreen === "function";
+  function tgInsets() {
+    const w = TG, r = document.documentElement.style, s = w.safeAreaInset || {}, c = w.contentSafeAreaInset || {};
+    const sum = (k) => Math.max(0, (s[k] || 0) + (c[k] || 0));
+    // the app already pads every screen with --st/--sb/--sl/--sr (iOS env()); inside Telegram's webview env() is 0, so feed it Telegram's numbers
+    r.setProperty("--st", sum("top") + "px"); r.setProperty("--sb", sum("bottom") + "px");
+    r.setProperty("--sl", sum("left") + "px"); r.setProperty("--sr", sum("right") + "px");
+  }
+  function tgSync() {
+    if (!TG) return; try { tgInsets(); } catch {}
+    document.documentElement.classList.toggle("tg-fs", !!TG.isFullscreen);
+  }
+  function tgSetup(w) {
+    TG = w; document.documentElement.classList.add("tg");
+    try { w.expand(); } catch {}
+    const black = "#000000";
+    try { w.setHeaderColor(black); } catch {}
+    try { w.setBackgroundColor(black); } catch {}
+    if (tgVer("7.10")) { try { w.setBottomBarColor(black); } catch {} }
+    if (tgVer("7.7")) { try { w.disableVerticalSwipes(); } catch {} }      // scrolling the app must never close it
+    if (tgVer("8.0")) {
+      ["fullscreenChanged", "fullscreenFailed", "safeAreaChanged", "contentSafeAreaChanged", "viewportChanged"].forEach((e) => { try { w.onEvent(e, tgSync); } catch {} });
+      try { w.requestFullscreen(); } catch {}                              // on open; harmless if the client refuses (fullscreenFailed)
+    }
+    tgSync();
+  }
+  const fsShow = () => tgFsOk() || fsApi() || !standalone();            // an installed iPhone app is already full screen: no button
   function fullscreen() {
+    if (tgFsOk()) { try { if (TG.isFullscreen) { TG.exitFullscreen(); return "exit"; } TG.requestFullscreen(); return "enter"; } catch { return "unsupported"; } }
     const d = document, el = d.documentElement;
     if (fsEl()) { try { (d.exitFullscreen || d.webkitExitFullscreen).call(d); } catch {} return "exit"; }
     const req = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -203,6 +233,6 @@ const Yobel = (() => {
     initGestures(); document.addEventListener("pointerdown", unlock, { once: false, passive: true });
     reveal(); keys(); ['fullscreenchange', 'webkitfullscreenchange'].forEach((n) => document.addEventListener(n, fsSync));
   }
-  return { init, fullscreen, fsShow, burst, shofar, soundOn, setSound, countText, tagline, sky, dawnAmount, STAR };
+  return { init, tgSetup, fullscreen, fsShow, burst, shofar, soundOn, setSound, countText, tagline, sky, dawnAmount, STAR };
 })();
 if (typeof window !== "undefined") window.Yobel = Yobel;
