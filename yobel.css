@@ -1,46 +1,35 @@
-/* yobel.css - the Yobel theme (MEM-24). Loaded after app.css. Deep navy night, violet glow, gold only for what matters.
-   Gold = balance, P&L wins, active-trade borders, primary actions. Violet = the system being alive. */
+/* yobel.css - the Yobel theme (MEM-24), gold galaxy edition. Loaded after app.css. Smoky charcoal-black, warm gold / amber stardust, bronze highlights.
+   Gold = balance, P&L wins, active-trade borders, primary actions. Bronze = the system being alive. No purple anywhere. The moving galaxy is galaxy.js (canvas). */
 :root{
-  --bg:#070818; --bg2:#0d1030; --text:#f1eefc; --sec:rgba(214,208,246,.68); --ter:rgba(214,208,246,.40); --sep:rgba(167,139,250,.14);
-  --c1:rgba(13,16,48,.74); --c2:rgba(40,36,92,.78); --c3:rgba(255,255,255,.04);
-  --gold:#f5c76b; --gold-2:#e2b649; --gold-hi:#fff0c2; --violet:#8b5cf6; --violet-2:#a78bfa; --magenta:#d946ef;
-  --green:#f5c76b; --teal:#a78bfa; --teal-2:#8b5cf6; --tp:#a78bfa; --blue:#a78bfa; --cyan:#c4b5fd; --yellow:#f5c76b; --purple:#8b5cf6; --replay:#b79cff;
-  --red:#ff5c7a; --orange:#ff8a3d; --pink:#ff7ab8;
-  --glass-b:rgba(167,139,250,.17); --card-b:rgba(167,139,250,.17);
-  --shadow-1:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(5,4,30,.9); --shadow-2:0 2px 6px rgba(0,0,0,.4),0 20px 44px -20px rgba(5,4,30,.95);
+  --bg:#0a0908; --bg2:#15110c; --text:#f7f0e2; --sec:rgba(232,220,196,.70); --ter:rgba(232,220,196,.42); --sep:rgba(245,199,107,.14);
+  --c1:rgba(22,18,12,.74); --c2:rgba(46,36,20,.78); --c3:rgba(255,255,255,.04);
+  --gold:#f5c76b; --gold-2:#e2b649; --gold-hi:#fff0c2; --violet:#c28a2e; --violet-2:#e8c27a; --magenta:#d9822b;
+  --green:#f5c76b; --teal:#e8c27a; --teal-2:#c28a2e; --tp:#e8c27a; --blue:#e8c27a; --cyan:#f0d9a6; --yellow:#f5c76b; --purple:#c28a2e; --replay:#e8c27a;
+  --red:#ff5c7a; --orange:#ff8a3d; --pink:#e2c38d;
+  --glass-b:rgba(245,199,107,.16); --card-b:rgba(245,199,107,.16);
+  --shadow-1:0 1px 2px rgba(0,0,0,.5),0 10px 28px -14px rgba(0,0,0,.9); --shadow-2:0 2px 6px rgba(0,0,0,.5),0 20px 44px -20px rgba(0,0,0,.95);
   --dawn:0;
 }
-html,body{background:var(--bg)}
-/* ---- night sky: deep navy, violet glow, CSS-only city bokeh (one fixed layer, GPU-moved, no JS) ---- */
-body::before{content:"";position:fixed;inset:-20vh -20vw;z-index:-2;pointer-events:none;will-change:transform;
+html{background:var(--bg)}
+body{background:transparent!important}   /* the sky layers (z-index -2, -1) paint above html but under body's own background, so body stays clear */
+/* ---- backdrop: charcoal with warm gold light (static, one layer). The moving stardust + nebula is the canvas #yo-galaxy (galaxy.js, z-index -1). ---- */
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
   background:
-    radial-gradient(34px 34px at 12% 22%,rgba(167,139,250,.30),rgba(167,139,250,.10) 60%,transparent 64%),
-    radial-gradient(20px 20px at 22% 31%,rgba(217,70,239,.26),rgba(217,70,239,.08) 60%,transparent 64%),
-    radial-gradient(46px 46px at 83% 14%,rgba(139,92,246,.26),rgba(139,92,246,.08) 60%,transparent 64%),
-    radial-gradient(16px 16px at 74% 26%,rgba(245,199,107,.30),rgba(245,199,107,.08) 60%,transparent 64%),
-    radial-gradient(28px 28px at 90% 48%,rgba(167,139,250,.22),rgba(167,139,250,.06) 60%,transparent 64%),
-    radial-gradient(52px 52px at 8% 62%,rgba(139,92,246,.22),rgba(139,92,246,.06) 60%,transparent 64%),
-    radial-gradient(18px 18px at 28% 74%,rgba(245,199,107,.22),rgba(245,199,107,.06) 60%,transparent 64%),
-    radial-gradient(38px 38px at 66% 82%,rgba(217,70,239,.20),rgba(217,70,239,.06) 60%,transparent 64%),
-    radial-gradient(24px 24px at 48% 90%,rgba(167,139,250,.24),rgba(167,139,250,.07) 60%,transparent 64%),
-    radial-gradient(14px 14px at 56% 8%,rgba(196,181,253,.30),rgba(196,181,253,.08) 60%,transparent 64%),
-    radial-gradient(60vmax 40vmax at 14% -4%,rgba(124,58,237,.34),transparent 62%),
-    radial-gradient(52vmax 40vmax at 100% 22%,rgba(91,33,182,.30),transparent 62%),
-    radial-gradient(60vmax 36vmax at 40% 112%,rgba(217,70,239,.14),transparent 62%),
-    linear-gradient(180deg,#0d1030 0%,#090a22 45%,#070818 100%);
-  animation:yoDrift 26s ease-in-out infinite alternate}
-@keyframes yoDrift{to{transform:translate3d(0,2.4vh,0) scale(1.04)}}
+    radial-gradient(70vmax 46vmax at 10% -6%,rgba(194,138,46,.20),transparent 62%),
+    radial-gradient(56vmax 42vmax at 100% 24%,rgba(140,92,30,.16),transparent 62%),
+    radial-gradient(64vmax 38vmax at 38% 112%,rgba(217,130,43,.10),transparent 62%),
+    linear-gradient(180deg,#120e09 0%,#0c0a07 50%,#080706 100%)}
 /* dawn: 05:00-08:00 CET the sky warms; --dawn (0..1) is set by yobel.js, the layer only fades */
 body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--dawn);transition:opacity 2s linear;
-  background:radial-gradient(90vmax 55vmax at 78% 108%,rgba(255,150,70,.46),rgba(245,199,107,.22) 42%,transparent 70%),linear-gradient(180deg,transparent 30%,rgba(255,130,80,.12) 70%,rgba(245,199,107,.16))}
+  background:radial-gradient(90vmax 55vmax at 78% 108%,rgba(255,150,70,.40),rgba(245,199,107,.20) 42%,transparent 70%),linear-gradient(180deg,transparent 30%,rgba(255,130,80,.10) 70%,rgba(245,199,107,.14))}
 /* ---- header / brand ---- */
-.pphead{background:linear-gradient(#070818f2 60%,#07081800)}
-.pplogo{border:0!important;background:none!important;border-radius:10px;box-shadow:0 0 0 1px rgba(245,199,107,.35),0 0 18px -2px rgba(139,92,246,.7)}
+.pphead{background:linear-gradient(#0a0908f2 60%,#0a090800)}
+.pplogo{border:0!important;background:none!important;border-radius:10px;box-shadow:0 0 0 1px rgba(245,199,107,.35)}
 .bname{font-weight:800;letter-spacing:.2px}
 .bname span,.bname{background:linear-gradient(90deg,#fff0c2,#f5c76b 55%,#e2b649);-webkit-background-clip:text;background-clip:text;color:transparent}
 .btag{color:var(--sec)}.btag b{color:var(--gold);font-weight:700}
 /* ---- hero: night sky card, gold balance, gold-bordered stat tiles ---- */
-.hero.glass{background:linear-gradient(165deg,rgba(54,32,140,.62),rgba(13,16,48,.86) 60%);border:1px solid rgba(167,139,250,.28);box-shadow:var(--card-hi),0 0 0 1px rgba(245,199,107,.05),0 18px 50px -24px rgba(124,58,237,.7)}
+.hero.glass{background:linear-gradient(165deg,rgba(106,76,35,.62),rgba(36,29,19,.86) 60%);border:1px solid rgba(226,195,141,.28);box-shadow:var(--card-hi),0 0 0 1px rgba(245,199,107,.05),0 18px 50px -24px rgba(211,162,78,.7)}
 .hero::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:var(--dawn);transition:opacity 2s linear;
   background:radial-gradient(120% 90% at 85% -10%,rgba(255,170,80,.62),rgba(245,199,107,.22) 45%,transparent 72%),linear-gradient(180deg,rgba(255,140,70,.16),transparent 60%)}
 .hero>*{position:relative}
@@ -54,13 +43,13 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opa
 .ranges button{color:var(--sec)}
 .ranges button.on{color:#2a1c04;background:linear-gradient(180deg,#ffe3a0,#f5c76b);box-shadow:0 0 16px rgba(245,199,107,.5)}
 /* ---- positions: gold-bordered active-trade cards with a glowing pulse; swipeable when there are two or more ---- */
-.prow{background:linear-gradient(160deg,rgba(40,30,96,.7),rgba(13,16,48,.82));border:1px solid rgba(245,199,107,.55);box-shadow:0 0 0 1px rgba(245,199,107,.08),0 0 22px -6px rgba(245,199,107,.5);animation:yoPulse 3.2s ease-in-out infinite;overflow:hidden;position:relative}
+.prow{background:linear-gradient(160deg,rgba(73,59,40,.7),rgba(36,29,19,.82));border:1px solid rgba(245,199,107,.55);box-shadow:0 0 0 1px rgba(245,199,107,.08),0 0 22px -6px rgba(245,199,107,.5);animation:yoPulse 3.2s ease-in-out infinite;overflow:hidden;position:relative}
 .prow.gain{border-color:rgba(245,199,107,.6);animation:yoPulse 3.2s ease-in-out infinite}
 .prow.loss{border-color:rgba(255,92,122,.5);box-shadow:0 0 0 1px rgba(255,92,122,.08),0 0 22px -6px rgba(255,92,122,.45);animation:yoPulseR 3.2s ease-in-out infinite}
 @keyframes yoPulse{50%{box-shadow:0 0 0 1px rgba(245,199,107,.16),0 0 34px -4px rgba(245,199,107,.7)}}
 @keyframes yoPulseR{50%{box-shadow:0 0 0 1px rgba(255,92,122,.16),0 0 34px -4px rgba(255,92,122,.65)}}
-.pic{background:linear-gradient(135deg,rgba(245,199,107,.3),rgba(139,92,246,.3));color:var(--gold-hi)}
-.prow.loss .pic{background:linear-gradient(135deg,rgba(255,92,122,.32),rgba(139,92,246,.2))}
+.pic{background:linear-gradient(135deg,rgba(245,199,107,.3),rgba(219,180,112,.3));color:var(--gold-hi)}
+.prow.loss .pic{background:linear-gradient(135deg,rgba(255,92,122,.32),rgba(219,180,112,.2))}
 .plist:has(.prow + .prow){flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -16px;padding:6px 16px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .plist:has(.prow + .prow)::-webkit-scrollbar{display:none}
 .plist:has(.prow + .prow) .prow{flex:0 0 88%;scroll-snap-align:center}
@@ -68,31 +57,31 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opa
 /* ---- lists / cards: violet glass ---- */
 .list,.card,.empty,.cp,.disc,.social,.sk{border-color:var(--glass-b)}
 .glass{background:var(--c1);border-color:var(--glass-b);box-shadow:var(--card-hi),var(--shadow-1)}
-.tlist.glass,.feed.glass,.live.glass{border-color:rgba(167,139,250,.2)}
+.tlist.glass,.feed.glass,.live.glass{border-color:rgba(226,195,141,.2)}
 .trow.buy,.frow.buy{--accent:var(--violet-2)}
-.tag.buy{color:#d9ccff;background:rgba(139,92,246,.22)}
-.tag.sell{color:#d9ccff;background:rgba(139,92,246,.2)}
+.tag.buy{color:#f1e9da;background:rgba(219,180,112,.22)}
+.tag.sell{color:#f1e9da;background:rgba(219,180,112,.2)}
 .tag.tp{color:#2a1c04;background:linear-gradient(90deg,#ffe3a0,#f5c76b)}
-.tag.ss{color:#2a1c04;background:linear-gradient(135deg,#ffe3a0,#f5c76b 60%,#c8921f);margin-right:4px;box-shadow:0 0 12px -2px rgba(139,92,246,.8)}
+.tag.ss{color:#2a1c04;background:linear-gradient(135deg,#ffe3a0,#f5c76b 60%,#c8921f);margin-right:4px;box-shadow:0 0 12px -2px rgba(219,180,112,.8)}
 .tag.stop{background:var(--red)}
 .up{color:var(--gold)}.down{color:var(--red)}
 .tval.up{color:var(--gold)}
 /* ---- bot strip: violet lights ---- */
-.bchip{background:linear-gradient(180deg,rgba(54,40,120,.5),rgba(13,16,48,.8))}
+.bchip{background:linear-gradient(180deg,rgba(98,71,33,.5),rgba(36,29,19,.8))}
 .bchip.ok .light{background:var(--violet-2);box-shadow:0 0 10px var(--violet);animation:breathe 2.4s ease-in-out infinite}
 .bchip.ok .bs{color:var(--violet-2)}
 .bot .sdot.running{background:var(--violet-2);box-shadow:0 0 8px var(--violet)}
 @keyframes breathe{50%{box-shadow:0 0 3px var(--violet);opacity:.75}}
 /* ---- tab bar ---- */
-.tabbar{background:rgba(10,10,38,.78);border-top:1px solid rgba(167,139,250,.2);box-shadow:0 -10px 30px -14px rgba(124,58,237,.5)}
-.tabbar button{color:rgba(196,181,253,.5)}
-.tabbar button.on{color:#e6dcff;text-shadow:0 0 14px rgba(167,139,250,.9)}
-.tabbar button.on svg{filter:drop-shadow(0 0 6px rgba(167,139,250,.9))}
+.tabbar{background:rgba(29,23,15,.78);border-top:1px solid rgba(226,195,141,.2);box-shadow:0 -10px 30px -14px rgba(211,162,78,.5)}
+.tabbar button{color:rgba(234,223,200,.5)}
+.tabbar button.on{color:#f7f1e4;text-shadow:0 0 14px rgba(226,195,141,.9)}
+.tabbar button.on svg{filter:drop-shadow(0 0 6px rgba(226,195,141,.9))}
 /* ---- buttons: gold is the primary action ---- */
 .btn.primary{background:linear-gradient(180deg,#ffe3a0,#f5c76b 60%,#e2b649);color:#2a1c04;box-shadow:0 8px 24px -10px rgba(245,199,107,.7)}
 .btn.red{background:var(--red)}
 .back,.fomo,.loadmore,h2.sec .more{color:var(--violet-2)}
-h1.title{background:linear-gradient(90deg,#fff,#d9ccff);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1.title{background:linear-gradient(90deg,#ffffff,#f1e9da);-webkit-background-clip:text;background-clip:text;color:transparent}
 .switch.on,.sw.on{background:linear-gradient(90deg,#e2b649,#f5c76b)}
 .set input[type=range]{accent-color:var(--gold)}
 .mbadge.paper{color:#1b0f00;background:var(--orange)}
@@ -101,29 +90,29 @@ h1.title{background:linear-gradient(90deg,#fff,#d9ccff);-webkit-background-clip:
 .lvchip.late{color:var(--orange);background:rgba(255,138,61,.14)}.lvchip.late i{background:var(--orange)}
 .mbadge.live i{background:#ff5c7a}
 /* ---- guide card, sheets, banners ---- */
-.guidecard img{border:1px solid rgba(245,199,107,.4);background:#0d1030}
+.guidecard img{border:1px solid rgba(245,199,107,.4);background:#241d13}
 .guidecard .go{color:var(--gold)}
-.sheet .in{background:linear-gradient(180deg,#14163f,#0d1030);border:1px solid rgba(167,139,250,.2);border-bottom:0}
-.toast{background:rgba(40,36,92,.95);border:1px solid rgba(167,139,250,.3)}
-.ppban{background:rgba(13,16,48,.94)}
-.ppban.buy,.ppban.sell{border-color:rgba(167,139,250,.7);box-shadow:0 0 30px rgba(139,92,246,.45)}.ppban.buy b,.ppban.buy span,.ppban.sell b,.ppban.sell span{color:#c4b5fd}
+.sheet .in{background:linear-gradient(180deg,#30271a,#241d13);border:1px solid rgba(226,195,141,.2);border-bottom:0}
+.toast{background:rgba(72,60,43,.95);border:1px solid rgba(226,195,141,.3)}
+.ppban{background:rgba(36,29,19,.94)}
+.ppban.buy,.ppban.sell{border-color:rgba(226,195,141,.7);box-shadow:0 0 30px rgba(219,180,112,.45)}.ppban.buy b,.ppban.buy span,.ppban.sell b,.ppban.sell span{color:#eadfc8}
 .ppban.tp{border-color:rgba(245,199,107,.75);box-shadow:0 0 36px rgba(245,199,107,.5)}.ppban.tp b,.ppban.tp span{color:var(--gold)}
 /* ---- Starship: gold morning-star mark, violet glow, gold-bordered cards (label unchanged) ---- */
-.ssico,.ssmark{color:var(--gold);filter:drop-shadow(0 0 8px rgba(139,92,246,.9));display:inline-grid;place-items:center;line-height:1}
+.ssico,.ssmark{color:var(--gold);filter:drop-shadow(0 0 8px rgba(219,180,112,.9));display:inline-grid;place-items:center;line-height:1}
 .ssico svg,.ssmark svg{width:1em;height:1em;display:block}
 .ssmark{font-size:44px}
 .ssico.lift,.ssmark.lift{animation:yoStar 2.4s ease-in-out infinite}
 @keyframes yoStar{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.14) rotate(14deg)}}
-.sshome{border:1px solid rgba(245,199,107,.3);background:linear-gradient(120deg,rgba(54,32,140,.55),rgba(13,16,48,.9))}
-.sshome.on{border-color:rgba(245,199,107,.8);background:linear-gradient(120deg,rgba(74,44,170,.6),rgba(13,16,48,.92));box-shadow:0 0 0 1px rgba(245,199,107,.14),0 0 30px -6px rgba(245,199,107,.55)}
+.sshome{border:1px solid rgba(245,199,107,.3);background:linear-gradient(120deg,rgba(106,76,35,.55),rgba(36,29,19,.9))}
+.sshome.on{border-color:rgba(245,199,107,.8);background:linear-gradient(120deg,rgba(132,95,44,.6),rgba(36,29,19,.92));box-shadow:0 0 0 1px rgba(245,199,107,.14),0 0 30px -6px rgba(245,199,107,.55)}
 .sspill.on{background:linear-gradient(135deg,#ffe3a0,#f5c76b);color:#2a1c04}
-.sshero{border:1px solid rgba(245,199,107,.3);background:radial-gradient(120% 90% at 85% 0%,rgba(139,92,246,.34),transparent 60%),linear-gradient(170deg,#161246,#0b0d2a)}
-.sshero.on{border-color:rgba(245,199,107,.8);background:radial-gradient(120% 90% at 85% 0%,rgba(245,199,107,.26),transparent 60%),radial-gradient(90% 80% at 0% 100%,rgba(139,92,246,.36),transparent 60%),linear-gradient(170deg,#1b1450,#0b0d2a);box-shadow:0 0 36px -8px rgba(245,199,107,.5)}
+.sshero{border:1px solid rgba(245,199,107,.3);background:radial-gradient(120% 90% at 85% 0%,rgba(219,180,112,.34),transparent 60%),linear-gradient(170deg,#35291b,#201910)}
+.sshero.on{border-color:rgba(245,199,107,.8);background:radial-gradient(120% 90% at 85% 0%,rgba(245,199,107,.26),transparent 60%),radial-gradient(90% 80% at 0% 100%,rgba(219,180,112,.36),transparent 60%),linear-gradient(170deg,#3c2f1e,#201910);box-shadow:0 0 36px -8px rgba(245,199,107,.5)}
 .sspnl{border-color:rgba(245,199,107,.25)}
 /* ---- Account: about card ---- */
-.yoabout{margin-top:22px;padding:16px;border-radius:var(--r-lg);border:1px solid rgba(245,199,107,.3);background:linear-gradient(160deg,rgba(54,32,140,.45),rgba(13,16,48,.85));box-shadow:0 0 28px -12px rgba(245,199,107,.5)}
+.yoabout{margin-top:22px;padding:16px;border-radius:var(--r-lg);border:1px solid rgba(245,199,107,.3);background:linear-gradient(160deg,rgba(106,76,35,.45),rgba(36,29,19,.85));box-shadow:0 0 28px -12px rgba(245,199,107,.5)}
 .yoabout .yh{display:flex;align-items:center;gap:12px}
-.yoabout img{width:44px;height:44px;border-radius:12px;box-shadow:0 0 0 1px rgba(245,199,107,.4),0 0 16px -2px rgba(139,92,246,.7)}
+.yoabout img{width:44px;height:44px;border-radius:12px;box-shadow:0 0 0 1px rgba(245,199,107,.4),0 0 16px -2px rgba(219,180,112,.7)}
 .yoabout b{font:800 18px var(--font);background:linear-gradient(90deg,#fff0c2,#f5c76b);-webkit-background-clip:text;background-clip:text;color:transparent}
 .yoabout .yt{color:var(--sec);font-size:13px;margin-top:2px}
 .yoabout p{margin:12px 0 0;color:var(--sec);font-size:14px;line-height:1.5}
@@ -131,9 +120,9 @@ h1.title{background:linear-gradient(90deg,#fff,#d9ccff);-webkit-background-clip:
 .prow,.trow,.frow,.row,.btn,.guidecard,.sshome,.bchip,.xrow,.hstats div,.stats div,.wchip,.rpwc,.rptr,.cp-buy,.cp-btn,.iconbtn{transition:transform .16s var(--ease),background-color .2s;-webkit-user-select:none;user-select:none}
 .prow:active,.trow:active,.frow:active,.row:active,.btn:active,.guidecard:active,.sshome:active,.bchip:active,.xrow:active,.wchip:active,.rpwc:active,.rptr:active,.iconbtn:active{transform:scale(.975)}
 .trow,.frow,.row,.btn,.guidecard,.sshome,.bchip,.xrow,.rptr,.rpwc{position:relative;overflow:hidden}
-.yo-rip{position:absolute;border-radius:50%;pointer-events:none;width:12px;height:12px;margin:-6px 0 0 -6px;background:radial-gradient(circle,rgba(245,199,107,.55),rgba(167,139,250,.28) 55%,transparent 70%);animation:yoRip .6s ease-out forwards}
+.yo-rip{position:absolute;border-radius:50%;pointer-events:none;width:12px;height:12px;margin:-6px 0 0 -6px;background:radial-gradient(circle,rgba(245,199,107,.55),rgba(226,195,141,.28) 55%,transparent 70%);animation:yoRip .6s ease-out forwards}
 @keyframes yoRip{from{transform:scale(1);opacity:.9}to{transform:scale(34);opacity:0}}
-.yo-ptr{position:fixed;left:50%;top:calc(var(--st) + 6px);z-index:45;transform:translate(-50%,-70px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 10px;border-radius:17px;font:700 12.5px var(--font);color:var(--gold);background:rgba(13,16,48,.92);border:1px solid rgba(245,199,107,.45);box-shadow:0 0 22px -4px rgba(139,92,246,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.yo-ptr{position:fixed;left:50%;top:calc(var(--st) + 6px);z-index:45;transform:translate(-50%,-70px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 10px;border-radius:17px;font:700 12.5px var(--font);color:var(--gold);background:rgba(36,29,19,.92);border:1px solid rgba(245,199,107,.45);box-shadow:0 0 22px -4px rgba(219,180,112,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 .yo-ptr svg{width:18px;height:18px;transition:transform .1s linear}
 .yo-ptr.spin svg{animation:yoSpin .8s linear infinite}
 @keyframes yoSpin{to{transform:rotate(360deg)}}
@@ -149,7 +138,7 @@ h1.title{background:linear-gradient(90deg,#fff,#d9ccff);-webkit-background-clip:
 
 /* ===== realistic pass: a pro trading terminal, not a toy. Hairlines, tabular mono numerals, restrained glow. ===== */
 body::before{opacity:.62}
-.hero.glass{box-shadow:var(--card-hi),0 14px 40px -26px rgba(124,58,237,.55);border-color:rgba(167,139,250,.22)}
+.hero.glass{box-shadow:var(--card-hi),0 14px 40px -26px rgba(211,162,78,.55);border-color:rgba(226,195,141,.22)}
 .tw{filter:none;letter-spacing:-1px}
 .hero .balance{font-weight:700;letter-spacing:-1.4px}
 .hstats div,.stats div{border-color:rgba(245,199,107,.24);background:linear-gradient(180deg,rgba(245,199,107,.06),rgba(255,255,255,.012));box-shadow:inset 0 1px 0 rgba(255,240,194,.08)}
@@ -160,20 +149,20 @@ body::before{opacity:.62}
 .prow{border-color:rgba(245,199,107,.42);box-shadow:0 0 0 1px rgba(245,199,107,.05),0 0 16px -8px rgba(245,199,107,.4)}
 .prow.gain{border-color:rgba(245,199,107,.46)}
 .sshome.on,.sshero.on{box-shadow:0 0 22px -10px rgba(245,199,107,.45)}
-.list,.tlist,.feed,.card,.empty,.live,.cp,.disc{border-color:rgba(167,139,250,.14)}
-.row + .row::before,.trow + .trow::before{border-top-color:rgba(167,139,250,.10)}
+.list,.tlist,.feed,.card,.empty,.live,.cp,.disc{border-color:rgba(226,195,141,.14)}
+.row + .row::before,.trow + .trow::before{border-top-color:rgba(226,195,141,.10)}
 h2.sec,.home h2.sec{font-weight:650;letter-spacing:.1px}
 .hlab{font-size:11.5px;letter-spacing:.8px}
 .ranges button.on{box-shadow:0 0 10px rgba(245,199,107,.3)}
-.yo-ptr{box-shadow:0 0 14px -6px rgba(139,92,246,.7)}
+.yo-ptr{box-shadow:0 0 14px -6px rgba(219,180,112,.7)}
 /* ===== Replay v2: one chart, one play/pause, a simple scrubber; details behind a tap ===== */
 .rpctl3{display:flex;align-items:center;gap:12px;margin:10px 0 2px}
 .rpctl3 .cb.big{flex:none;width:52px;height:52px;border-radius:50%;font-size:18px;background:linear-gradient(180deg,#ffe3a0,#f5c76b 60%,#e2b649);color:#2a1c04;box-shadow:0 8px 22px -10px rgba(245,199,107,.7)}
-.rplab{flex:1;min-width:0;min-height:40px;display:flex;align-items:center;padding:0 12px;border-radius:10px;font:700 12.5px var(--mono);letter-spacing:.2px;color:var(--c,var(--violet-2));background:rgba(13,16,48,.7);border:1px solid rgba(167,139,250,.16);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .25s,box-shadow .25s,border-color .25s}
+.rplab{flex:1;min-width:0;min-height:40px;display:flex;align-items:center;padding:0 12px;border-radius:10px;font:700 12.5px var(--mono);letter-spacing:.2px;color:var(--c,var(--violet-2));background:rgba(36,29,19,.7);border:1px solid rgba(226,195,141,.16);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .25s,box-shadow .25s,border-color .25s}
 .rplab:empty::before{content:"auto slow-motion at every trade";color:var(--ter);font:600 12px var(--font)}
 .rplab.pre{opacity:.6;border-color:var(--c)}
-.rplab.hit{opacity:1;border-color:var(--c);box-shadow:0 0 16px -4px var(--c);background:rgba(13,16,48,.92);font-size:13.5px}
-.rpmore{display:flex;width:100%;align-items:center;justify-content:space-between;min-height:46px;margin:12px 0 6px;padding:0 14px;border-radius:12px;border:1px solid rgba(167,139,250,.18);background:rgba(13,16,48,.6);font:650 14px var(--font);color:var(--text)}
+.rplab.hit{opacity:1;border-color:var(--c);box-shadow:0 0 16px -4px var(--c);background:rgba(36,29,19,.92);font-size:13.5px}
+.rpmore{display:flex;width:100%;align-items:center;justify-content:space-between;min-height:46px;margin:12px 0 6px;padding:0 14px;border-radius:12px;border:1px solid rgba(226,195,141,.18);background:rgba(36,29,19,.6);font:650 14px var(--font);color:var(--text)}
 .rpmore span{color:var(--violet-2);transition:transform .2s}.rpmore.open span{transform:rotate(180deg)}
 .rpstep.flash,.rpwc.flash{animation:yoFlash 1.3s ease-out}
 @keyframes yoFlash{0%{box-shadow:0 0 0 1px var(--gold),0 0 20px -2px rgba(245,199,107,.6)}100%{box-shadow:none}}
@@ -183,7 +172,7 @@ html,body{overscroll-behavior-x:none}
 .trsum{display:flex;align-items:baseline;justify-content:space-between;margin:-2px 2px 12px;font:600 13px var(--font);color:var(--ter)}
 .trsum b{font:700 18px var(--mono);font-variant-numeric:tabular-nums}
 .trchips{display:flex;gap:8px;margin:0 0 12px}
-.trchip{flex:1;min-height:40px;border-radius:12px;border:1px solid rgba(167,139,250,.2);background:rgba(13,16,48,.6);color:var(--sec);font:650 14px var(--font);transition:transform .12s}
+.trchip{flex:1;min-height:40px;border-radius:12px;border:1px solid rgba(226,195,141,.2);background:rgba(36,29,19,.6);color:var(--sec);font:650 14px var(--font);transition:transform .12s}
 .trchip i{font-style:normal;font:600 12px var(--mono);opacity:.7;margin-left:4px}
 .trchip:active{transform:scale(.97)}
 .trchip.on{background:linear-gradient(180deg,#ffe3a0,#f5c76b 60%,#e2b649);color:#2a1c04;border-color:transparent;box-shadow:0 6px 18px -10px rgba(245,199,107,.7)}
@@ -193,3 +182,34 @@ html,body{overscroll-behavior-x:none}
 .trrow .tag.ss{font-size:10px;padding:0 6px;min-height:0;line-height:16px;vertical-align:1px}
 .trrow .trwhy{color:var(--ter);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .brand>div{min-width:0}.btag{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ===== placeholder wordmark (logo pending): plain gold YOBEL, no mark. To swap: set MARK_SRC in app.js + drop icons/. ===== */
+.brand .bname{text-transform:uppercase;letter-spacing:.24em;font-weight:800;font-size:19px;line-height:1.1;padding-bottom:2px}
+.brand .btag{letter-spacing:0;margin-top:2px}
+.ymark{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;border:1px solid rgba(245,199,107,.35);background:#100e0b;color:var(--gold);font-size:22px;line-height:1}
+.yoabout .yh .ymark{width:46px;height:46px}
+.yo-fsbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+html.yo-fs .yo-fsbtn{color:var(--gold)}
+/* ===== wide screens: Home uses the full width as a 3-column dashboard; lists become 2 columns ===== */
+@media (min-width:1100px){
+  #view:has(.home){max-width:none;padding-left:36px;padding-right:36px}
+  .home{gap:20px 24px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,.9fr);grid-template-areas:"hero frame trades" "bots bots trades" "pos xtr trades" "feed guide trades"}
+  .balance{font-size:84px!important}
+}
+@media (min-width:1700px){#view:has(.home){padding-left:64px;padding-right:64px}.home{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,.95fr)}}
+@media (min-width:900px){.list:has(> .trrow){display:grid;grid-template-columns:1fr 1fr;column-gap:16px}}
+@media (min-width:900px){.pphead{padding-left:4px;padding-right:4px}}
+/* ===== hover for mouse users, press for touch ===== */
+@media (hover:hover) and (pointer:fine){
+  .row,.prow,.guidecard,.trchip,.rpmore,.rpwin,.rptr,.btn{cursor:pointer;transition:border-color .15s,background-color .15s,transform .15s,box-shadow .2s}
+  .row:hover,.guidecard:hover,.rpmore:hover,.rpwin:hover,.rptr:hover{background-color:rgba(219,180,112,.08)}
+  .prow:hover{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(245,199,107,.25),0 10px 28px -14px rgba(245,199,107,.45)}
+  .trchip:hover:not(.on){border-color:rgba(245,199,107,.4);color:var(--text)}
+  .iconbtn:hover{background:rgba(226,195,141,.12)}
+}
+/* ===== scroll reveal (class added by yobel.js only for sections below the fold) ===== */
+.yo-rv{opacity:0;transform:translateY(12px);transition:opacity .45s ease,transform .45s cubic-bezier(.2,.7,.2,1)}
+.yo-rv.yo-rv-in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.yo-rv{opacity:1;transform:none;transition:none}}
+/* ===== notices fade out; tap/swipe closes them early ===== */
+.maint,.toast{transition:opacity .4s ease}.maint.out,.toast.out{opacity:0}
+.maint,.toast,.ppban{cursor:pointer}

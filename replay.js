@@ -20,10 +20,10 @@ const Replay = (() => {
   const clock = (ts) => fT.format(new Date(ts * 1000)), hhmm = (ts) => fH.format(new Date(ts * 1000));
   const stamp = (ts) => fD.format(new Date(ts * 1000)) + " " + hhmm(ts);
   const dur = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`; };
-  const BOT = { scanner: "#9b73f6", analyst: "#bf5af2", brain: "#ff802b", executor: "#f7cb6b", risk: "#ff4d6d", desk: "#8e8e93" };
+  const BOT = { scanner: "#e0bd82", analyst: "#dab16b", brain: "#ff802b", executor: "#f7cb6b", risk: "#ff4d6d", desk: "#8e8e93" };
   const botColor = (n) => { const b = ((B.S.state && B.S.state.bots) || []).find((x) => x.name === n); return (b && b.color) || BOT[n] || "#8e8e93"; };
   const botName = (n) => ({ scanner: "Scanner", analyst: "Analyst", brain: "Brain", executor: "Executor", risk: "Risk", desk: "Desk" }[n] || n);
-  const KC = { buy: "#f7c967", tp: "#f7cc6e", trail: "#9b73f6", stop: "#ff4d6d", manual: "#9064f5", exit: "#9064f5", moonbag_on: "#a37ff7", breakeven: "#ffd60a" };
+  const KC = { buy: "#f7c967", tp: "#f7cc6e", trail: "#e0bd82", stop: "#ff4d6d", manual: "#ddb775", exit: "#ddb775", moonbag_on: "#e2c38c", breakeven: "#ffd60a" };
   const KL = { buy: "BUY", tp: "TP", trail: "TRAIL", stop: "STOP", manual: "EXIT", exit: "EXIT", moonbag_on: "MOON", breakeven: "BE" };
   const SRC = { migration: "migration feed", near_grad: "near-graduation feed", x_trend: "X trend", jup_recent: "Jupiter feed", launchlab: "LaunchLab", smart_money: "smart-money wallets", helius_pool: "new-pool stream" };
   const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -226,7 +226,7 @@ const Replay = (() => {
     const k = s.ev && s.d < s.L && s.f < 0.97 ? (s.d <= s.H * 1.4 ? "hit" : "pre") + "|" + s.ev.label + "|" + s.ev.kind : "";
     if (el.dataset.k === k) return; el.dataset.k = k; R.curEv = k ? s.ev : null;
     if (!k) { el.textContent = ""; el.className = "rplab"; return; }
-    el.textContent = s.ev.label; el.className = "rplab " + k.split("|")[0]; el.style.setProperty("--c", KC[s.ev.kind] || "#a27df7");
+    el.textContent = s.ev.label; el.className = "rplab " + k.split("|")[0]; el.style.setProperty("--c", KC[s.ev.kind] || "#e2c28b");
   }
   const jump = (dir) => { const ts = R.marks.filter((t) => t >= R.t0 && t <= R.t1); let t = dir > 0 ? ts.find((x) => x > R.pos + 0.5) : [...ts].reverse().find((x) => x < R.pos - 0.5); if (t == null) t = dir > 0 ? R.t1 : R.t0; R.pos = t; frame(true); };
 
@@ -286,14 +286,14 @@ const Replay = (() => {
     const lo0 = D._lo, hi0 = D._hi, padv = (hi0 - lo0) * 0.12 || hi0 * 0.1, lo = Math.max(lo0 - padv, 0), hi = hi0 + padv;
     const X = (t) => ml + pw * ((t - R.t0) / (R.t1 - R.t0)), Y = (p) => mt + ph * (1 - (p - lo) / (hi - lo));
     g.font = "600 10px ui-monospace,SFMono-Regular,Menlo,monospace"; g.textBaseline = "middle";
-    for (let i = 0; i <= 3; i++) { const p = lo + (hi - lo) * i / 3, y = Y(p); g.strokeStyle = "rgba(105,112,205,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke();
-      g.fillStyle = "rgba(211,213,237,.42)"; g.textAlign = "left"; g.fillText(D.supply ? compact(p * D.supply) : priceFmt(p).replace(/0+$/, ""), ml + pw + 6, y); }
+    for (let i = 0; i <= 3; i++) { const p = lo + (hi - lo) * i / 3, y = Y(p); g.strokeStyle = "rgba(214,168,90,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke();
+      g.fillStyle = "rgba(238,229,210,.42)"; g.textAlign = "left"; g.fillText(D.supply ? compact(p * D.supply) : priceFmt(p).replace(/0+$/, ""), ml + pw + 6, y); }
     const x0 = X(D.t_open), x1 = X(D.t_close || R.t1);                        // holding band
     g.fillStyle = "rgba(247,204,110,.06)"; g.fillRect(x0, mt, Math.max(2, x1 - x0), ph);
-    const ey = Y(D.entry); g.setLineDash([4, 4]); g.strokeStyle = "rgba(134,87,244,.55)"; g.beginPath(); g.moveTo(ml, ey); g.lineTo(ml + pw, ey); g.stroke(); g.setLineDash([]);
-    g.fillStyle = "rgba(134,87,244,.9)"; g.textAlign = "left"; g.fillText("ENTRY", ml + 2, ey - 8);
+    const ey = Y(D.entry); g.setLineDash([4, 4]); g.strokeStyle = "rgba(218,177,107,.55)"; g.beginPath(); g.moveTo(ml, ey); g.lineTo(ml + pw, ey); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "rgba(218,177,107,.9)"; g.textAlign = "left"; g.fillText("ENTRY", ml + 2, ey - 8);
     const px = D._px; g.lineJoin = "round"; g.lineCap = "round";
-    g.strokeStyle = "rgba(211,213,237,.22)"; g.lineWidth = 1.5; g.beginPath(); px.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();   // the whole line, faint
+    g.strokeStyle = "rgba(238,229,210,.22)"; g.lineWidth = 1.5; g.beginPath(); px.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();   // the whole line, faint
     const cur = [], past = px.filter((p) => p[0] <= R.pos); past.forEach((p) => cur.push([X(p[0]), Y(p[1])])); cur.push([X(R.pos), Y(S.price)]);
     const path = () => { g.beginPath(); cur.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); };
     const band = (y0, y1, col, fill) => { g.save(); g.beginPath(); g.rect(ml, y0, pw, y1 - y0); g.clip(); path(); g.strokeStyle = col; g.lineWidth = 2.4; g.stroke();
@@ -301,15 +301,15 @@ const Replay = (() => {
     band(0, ey, "#f7cb6b", "rgba(247,203,107,.22)"); band(ey, h, "#ff4d6d", "rgba(255,77,109,.16)");
     const lanes = [];                                                          // label lanes: close markers stack their tags instead of overlapping
     D._marks.filter((m) => m.ts <= R.pos).forEach((m) => { const x = X(m.ts), y = Y(m.price), col = KC[m.kind]; g.strokeStyle = col; g.globalAlpha = .35; g.lineWidth = 1; g.beginPath(); g.moveTo(x, mt); g.lineTo(x, mt + ph); g.stroke(); g.globalAlpha = 1;
-      g.fillStyle = "#04050f"; g.beginPath(); g.arc(x, y, 6.5, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(x, y, 4.8, 0, 7); g.fill();
+      g.fillStyle = "#0b0906"; g.beginPath(); g.arc(x, y, 6.5, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(x, y, 4.8, 0, 7); g.fill();
       const lab = KL[m.kind], tw = g.measureText(lab).width + 10, lx = Math.min(Math.max(x - tw / 2, ml), ml + pw - tw);
       let ln = 0; while (lanes[ln] != null && lanes[ln] > lx - 3) ln++; lanes[ln] = lx + tw;
       const up = y > mt + ph / 2, ly = Math.min(Math.max(up ? y - 18 - ln * 18 : y + 18 + ln * 18, mt + 8), mt + ph - 8);
-      g.fillStyle = "rgba(4,5,15,.9)"; rr(g, lx, ly - 8, tw, 16, 8); g.fill(); g.strokeStyle = col; g.lineWidth = 1; g.stroke(); g.fillStyle = col; g.textAlign = "center"; g.fillText(lab, lx + tw / 2, ly + .5); });
-    const hx = X(R.pos), hy = Y(S.price); g.strokeStyle = "rgba(163,127,247,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
-    g.shadowColor = "#a37ff7"; g.shadowBlur = 10; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, hy, 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
+      g.fillStyle = "rgba(11,9,6,.9)"; rr(g, lx, ly - 8, tw, 16, 8); g.fill(); g.strokeStyle = col; g.lineWidth = 1; g.stroke(); g.fillStyle = col; g.textAlign = "center"; g.fillText(lab, lx + tw / 2, ly + .5); });
+    const hx = X(R.pos), hy = Y(S.price); g.strokeStyle = "rgba(226,195,140,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
+    g.shadowColor = "#e2c38c"; g.shadowBlur = 10; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, hy, 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
     { const txt = D.supply ? compact(S.price * D.supply) : priceFmt(S.price), tw = Math.min(mr - 1, g.measureText(txt).width + 8), ty = hy; g.fillStyle = S.price >= D.entry ? "#ff9752" : "#ff5c7a"; rr(g, ml + pw + 1, ty - 8, tw, 16, 3); g.fill(); g.fillStyle = "#1a1204"; g.textAlign = "left"; g.fillText(txt, ml + pw + 5, ty + .5); }
-    g.fillStyle = "rgba(211,213,237,.40)"; g.textAlign = "center"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3 + (i === 0 ? 0 : i === 3 ? 0 : 0), h - 7); }
+    g.fillStyle = "rgba(238,229,210,.40)"; g.textAlign = "center"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3 + (i === 0 ? 0 : i === 3 ? 0 : 0), h - 7); }
     if (D.synthetic) { g.fillStyle = "rgba(255,128,43,.9)"; g.textAlign = "center"; g.fillText("no price history was saved for this trade", ml + pw / 2, mt + ph / 2); }
   }
   function drawWindow(bal) {
@@ -318,20 +318,20 @@ const Replay = (() => {
     const vals = R.pts.map((p) => p[1]); let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.12 || hi * 0.02; lo -= pad; hi += pad;
     const X = (t) => ml + pw * ((t - R.t0) / (R.t1 - R.t0)), Y = (v) => mt + ph * (1 - (v - lo) / (hi - lo));
     g.font = "600 10px ui-monospace,SFMono-Regular,Menlo,monospace"; g.textBaseline = "middle";
-    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3, y = Y(v); g.strokeStyle = "rgba(105,112,205,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.fillStyle = "rgba(211,213,237,.42)"; g.textAlign = "left"; g.fillText(money(v, 0), ml + pw + 6, y); }
-    const sy = Y(R.start); g.setLineDash([4, 4]); g.strokeStyle = "rgba(134,87,244,.5)"; g.beginPath(); g.moveTo(ml, sy); g.lineTo(ml + pw, sy); g.stroke(); g.setLineDash([]);
-    g.lineJoin = "round"; g.strokeStyle = "rgba(211,213,237,.22)"; g.lineWidth = 1.5; g.beginPath(); R.pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();
+    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3, y = Y(v); g.strokeStyle = "rgba(214,168,90,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.fillStyle = "rgba(238,229,210,.42)"; g.textAlign = "left"; g.fillText(money(v, 0), ml + pw + 6, y); }
+    const sy = Y(R.start); g.setLineDash([4, 4]); g.strokeStyle = "rgba(218,177,107,.5)"; g.beginPath(); g.moveTo(ml, sy); g.lineTo(ml + pw, sy); g.stroke(); g.setLineDash([]);
+    g.lineJoin = "round"; g.strokeStyle = "rgba(238,229,210,.22)"; g.lineWidth = 1.5; g.beginPath(); R.pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();
     const cur = R.pts.filter((p) => p[0] <= R.pos).map((p) => [X(p[0]), Y(p[1])]); cur.push([X(R.pos), Y(bal)]);
     const path = () => { g.beginPath(); cur.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); };
     const band = (y0, y1, col, fill) => { g.save(); g.beginPath(); g.rect(ml, y0, pw, y1 - y0); g.clip(); path(); g.strokeStyle = col; g.lineWidth = 2.4; g.stroke(); g.lineTo(cur[cur.length - 1][0], mt + ph); g.lineTo(cur[0][0], mt + ph); g.closePath();
       const gr = g.createLinearGradient(0, mt, 0, mt + ph); gr.addColorStop(0, fill); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fill(); g.restore(); };
     band(0, sy, "#f7cb6b", "rgba(247,203,107,.22)"); band(sy, h, "#ff4d6d", "rgba(255,77,109,.16)");
-    for (const t of R.trades) { if (t.t_open > R.pos) continue; const x = X(t.t_open), y = Y(priceAt(R.pts, t.t_open)); g.fillStyle = "rgba(134,87,244,.8)"; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill();
-      if (t.t_close && t.t_close <= R.pos) { const x2 = X(t.t_close), y2 = Y(priceAt(R.pts, t.t_close)), win = (t.pnl_usd || 0) >= 0; g.fillStyle = "#04050f"; g.beginPath(); g.arc(x2, y2, 5.4, 0, 7); g.fill(); g.fillStyle = win ? "#f7cb6b" : "#ff4d6d"; g.beginPath(); g.arc(x2, y2, 4, 0, 7); g.fill(); } }
-    const hx = X(R.pos); g.strokeStyle = "rgba(163,127,247,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
-    g.shadowColor = "#a37ff7"; g.shadowBlur = 10; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, Y(bal), 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
+    for (const t of R.trades) { if (t.t_open > R.pos) continue; const x = X(t.t_open), y = Y(priceAt(R.pts, t.t_open)); g.fillStyle = "rgba(218,177,107,.8)"; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill();
+      if (t.t_close && t.t_close <= R.pos) { const x2 = X(t.t_close), y2 = Y(priceAt(R.pts, t.t_close)), win = (t.pnl_usd || 0) >= 0; g.fillStyle = "#0b0906"; g.beginPath(); g.arc(x2, y2, 5.4, 0, 7); g.fill(); g.fillStyle = win ? "#f7cb6b" : "#ff4d6d"; g.beginPath(); g.arc(x2, y2, 4, 0, 7); g.fill(); } }
+    const hx = X(R.pos); g.strokeStyle = "rgba(226,195,140,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
+    g.shadowColor = "#e2c38c"; g.shadowBlur = 10; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, Y(bal), 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
     { const txt = money(bal, 0), tw = Math.min(mr - 1, g.measureText(txt).width + 8), ty = Y(bal); g.fillStyle = bal >= R.start ? "#ff9752" : "#ff5c7a"; rr(g, ml + pw + 1, ty - 8, tw, 16, 3); g.fill(); g.fillStyle = "#1a1204"; g.textAlign = "left"; g.fillText(txt, ml + pw + 5, ty + .5); }
-    g.fillStyle = "rgba(211,213,237,.40)"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3, h - 7); }
+    g.fillStyle = "rgba(238,229,210,.40)"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3, h - 7); }
   }
 
   // ---------- steps ----------

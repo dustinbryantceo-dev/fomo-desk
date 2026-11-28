@@ -266,20 +266,41 @@
   }
   // maintenance strip: deskctl writes data/.maint.json, the desk publishes it in state.maint
   function maintRow() {
+    // Update notice (MEM-24): "Updating…" stays while it runs; "Updated ✓" shows ~5.5 s, fades, never comes back for the same update;
+    // tap or swipe closes it early; if the app is opened >2 min after the update it stays silent. "Update not confirmed" stays until tapped.
     let el = $("#maint");
+    const mark = (key) => { S.maintSeen = key; try { localStorage.setItem("desk.maintSeen", key); } catch {} };
+    const dismiss = (key) => { mark(key); const e = $("#maint"); if (!e) return; e.classList.add("out"); clearTimeout(e._h); e._h = setTimeout(() => { e.hidden = true; e.classList.remove("out"); }, 420); };
     if (!el) { el = document.createElement("div"); el.id = "maint"; el.className = "maint"; el.hidden = true; el.setAttribute("role", "status"); document.body.appendChild(el);
-      el.onclick = () => { if (el.dataset.k !== "updating") { S.maintSeen = el.dataset.ts; el.hidden = true; } }; }
+      let x0 = 0, y0 = 0; el.onclick = () => { if (el.dataset.k !== "updating") dismiss(el.dataset.ts); };
+      el.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+      el.addEventListener("touchend", (e) => { const t = e.changedTouches[0]; if (el.dataset.k !== "updating" && (Math.abs(t.clientX - x0) > 40 || t.clientY - y0 > 28)) dismiss(el.dataset.ts); }, { passive: true }); }
     const m = S.state && S.state.maint;
-    if (!m || (m.state !== "updating" && S.maintSeen === String(m.ts))) { el.hidden = true; return; }
+    if (!m) { el.hidden = true; return; }
+    const key = String(m.ts);
+    if (m.state !== "updating") {
+      if (S.maintSeen === key || localStorage.getItem("desk.maintSeen") === key) { if (!el.classList.contains("out")) el.hidden = true; return; }
+      if (m.state === "done" && S.maintShown !== key) {
+        if (Date.now() / 1000 - m.ts > 120) { mark(key); el.hidden = true; return; }
+        S.maintShown = key; clearTimeout(S.maintT); S.maintT = setTimeout(() => dismiss(key), 5500);
+      }
+    }
     const left = m.eta_ts ? Math.ceil((m.eta_ts * 1000 - Date.now()) / 60000) : null;
     const txt = m.state === "updating" ? `🛠️ Updating… ${m.what || "Yobel"} · ${left == null ? "back soon" : left > 0 ? `back in ~${left} min` : "almost done"}`
       : m.state === "done" ? `Updated ✓${m.version ? " · " + m.version : ""}` : "⚠️ Update not confirmed · the desk is being checked";
-    el.className = "maint " + m.state; el.dataset.k = m.state; el.dataset.ts = String(m.ts);
+    if (el.classList.contains("out")) return;
+    el.className = "maint " + m.state; el.dataset.k = m.state; el.dataset.ts = key;
     if (el.textContent !== txt) el.textContent = txt; el.hidden = false;
+  }
+  // the unread dot on the bell: shows a few seconds, then clears itself (marks the feed as seen) and fades
+  function dotTick() {
+    const d = document.querySelector(".pphead .iconbtn .dot"); if (!d) { S.dotAt = 0; return; }
+    if (!S.dotAt) S.dotAt = Date.now();
+    if (Date.now() - S.dotAt > 6000) { const r = ((S.files["activity/0"] || {}).rows || [])[0]; if (r) localStorage.setItem("desk.seen", String(r.ts)); d.style.transition = "opacity .4s"; d.style.opacity = "0"; setTimeout(() => d.remove(), 450); S.dotAt = 0; }
   }
   function badgeTick() { const b = $("#mbadge"); if (b) { const h = modeBadge(); if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; } } }
   let lvUiTimer = 0;
-  function lvUiTick() { offlineRow(); liveLabel(); badgeTick(); maintRow(); lvPaint(); }
+  function lvUiTick() { offlineRow(); liveLabel(); badgeTick(); maintRow(); dotTick(); lvPaint(); }
   function lvUiArm() { lvUiTick(); clearInterval(lvUiTimer); lvUiTimer = setInterval(lvUiTick, 1000); }
   lvUiArm();   // start on load, do not wait for the first price or start()
   document.addEventListener("visibilitychange", () => { if (!document.hidden) lvUiArm(); });
@@ -304,7 +325,10 @@
   }
 
   // ---------- Yobel: home ----------
-  const LOGO = '<img src="icons/icon-192.png" class="pplogo" alt="Yobel">';
+  // LOGO SWAP: Dustin's own logo is pending. Until then the header shows the plain gold YOBEL wordmark (text, no mark).
+  // To use his logo: drop the file as icons/logo.svg (or .png), set MARK_SRC = "icons/logo.svg" and replace the PWA icons (same names) in icons/.
+  const MARK_SRC = null;
+  const LOGO = MARK_SRC ? `<img src="${MARK_SRC}" class="pplogo" alt="Yobel">` : "";
   const STAR = (window.Yobel && Yobel.STAR) || "\u2726";
   const yoTag = () => (window.Yobel ? Yobel.tagline() : "late night grind");
   // desk up = fresh data from the last poll; otherwise the badge says STANDBY (never "offline")
@@ -375,6 +399,7 @@
         <div class="brand">${LOGO}<div><div class="bname">Yobel</div><div class="btag"><b>${yoTag()}</b> · ${running}/5 online</div></div></div>
         <div class="navsp"></div>${S.viewer ? '<span class="vbadge">👀 VIEW ONLY</span>' : ""}<span id="mbadge">${modeBadge()}</span>
         ${canCtl() ? `<button class="iconbtn ${pausedNow().size ? "paused" : ""}" data-act="bots" aria-label="Pause or resume bots">${pausedNow().size ? ICON.play : ICON.pause}${pausedNow().size ? '<i class="dot amber"></i>' : ""}</button>` : ""}
+        ${window.Yobel && Yobel.fsShow() ? '<button class="iconbtn yo-fsbtn" data-act="fs" aria-label="Full screen" title="Full screen (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>' : ""}
         <button class="iconbtn" data-act="search" aria-label="Search">${ICON.search}</button>
         <button class="iconbtn" data-act="tab" data-tab="activity" aria-label="Activity">${ICON.bell}${unseen ? '<i class="dot"></i>' : ""}</button>
       </header>
@@ -421,7 +446,7 @@
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
         <section class="a-xtr">${xTrendsCard()}</section>
-        <section class="a-guide"><button class="guidecard glass" data-act="guide"><img src="icons/icon-192.png" alt=""><span class="gt"><b>How Yobel works</b><span>The 5 bots, PAPER vs LIVE, stops and take profit, in one guide</span></span><span class="go">›</span></button></section>
+        <section class="a-guide"><button class="guidecard glass" data-act="guide"><span class="ymark" aria-hidden="true">✦</span><span class="gt"><b>Yobel — how it works</b><span>The 5 bots, safety rules and Starship, in plain English</span></span><span class="go">›</span></button></section>
         <section class="a-feed">
           <h2 class="sec">Live feed <span class="count">· buys, sells, skips</span></h2>
           ${a.length ? `<div class="feed glass">${a.slice(0, 12).map(feedRow).join("")}</div>` : '<div class="empty glass">Nothing yet tonight</div>'}
@@ -545,7 +570,7 @@
     return `<div class="card bot" ${full ? "" : `data-act="tab" data-tab="bots"`}><div class="head">${st}<span style="color:${esc(b.color || "#ffffff")}">${esc(b.title || b.name)}</span><span class="ter" style="margin-left:auto;font-weight:400;font-size:13px">${esc(b.status || "off")}</span></div>${body}</div>`;
   }
   function actRow(r) {
-    const k = r.kind, col = k === "bought" ? "#f7cb6b" : k === "sold" ? (isTP(r) ? "#f7cc6e" : "#8657f4") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
+    const k = r.kind, col = k === "bought" ? "#f7cb6b" : k === "sold" ? (isTP(r) ? "#f7cc6e" : "#dab16b") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
     const rv = k === "rejected" ? `<span class="mut">Skipped</span>` : esc(r.value || "");
     const act = k === "rejected" ? "audit" : "coin";
     return `<div class="row" data-act="${act}" data-mint="${esc(r.mint)}"><div class="ic" style="color:${col}">${esc((r.title || "?").split(" ").pop().slice(0, 1))}</div>
@@ -563,7 +588,7 @@
     if (!rows || !rows.length) return '<div class="t2" style="padding:6px 0">No skips</div>';
     const max = Math.max(...rows.map((r) => r.coins)) || 1;
     return rows.slice(0, n).map((r) => `<div class="row" style="min-height:40px;padding:6px 0"><div class="tx"><div class="t1" style="font-size:15px">${esc(r.label)}${r.rug ? ' <span class="tag">🛡️ rug safety</span>' : ""}</div>
-      <div style="height:6px;border-radius:3px;background:var(--c3,#333333);margin-top:4px"><div style="height:6px;border-radius:3px;width:${Math.round((100 * r.coins) / max)}%;background:var(--accent,#9f7af6)"></div></div></div><div class="rv">${r.coins}</div></div>`).join("");
+      <div style="height:6px;border-radius:3px;background:var(--c3,#333333);margin-top:4px"><div style="height:6px;border-radius:3px;width:${Math.round((100 * r.coins) / max)}%;background:var(--accent,#e1c088)"></div></div></div><div class="rv">${r.coins}</div></div>`).join("");
   }
   function skipCard() {
     const s = S.files["skips"];
@@ -712,7 +737,7 @@
         <div class="row"><div class="tx"><div class="t1">Mode</div><div class="t2">${esc(st.mode || "–")}${st.mode === "LIVE" ? " · real money" : ""}</div></div></div>
         <div class="row"><div class="tx"><div class="t1">Cash</div><div class="t2">${money(st.cash)}</div></div></div></div>
       <div class="grp">Notifications</div><div class="list plain">${pushRow}</div><div class="ro p2msg" id="vmsg"></div>
-      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Yobel works</div><div class="t2">The bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
+      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">Yobel — how it works</div><div class="t2">The 5 bots, safety rules and Starship, in plain English</div></div><span class="ter">›</span></button></div>
       <div class="ter" style="font-size:12px;text-align:center;margin:20px 0">Last update ${hm(S.lastIxT)} · view only</div>`;
   }
   async function vFetch(path, body) {
@@ -778,10 +803,10 @@
         <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
       </div>` : ""}
       ${S.tg ? `<div class="grp">Home Screen</div>${tgHomeRow()}` : ""}
-      <div class="yoabout"><div class="yh"><img src="icons/icon-192.png" alt=""><div><b>Yobel</b><div class="yt">Jubilee · the year debts were cancelled</div></div></div>
+      <div class="yoabout"><div class="yh"><span class="ymark" aria-hidden="true">✦</span><div><b>Yobel</b><div class="yt">Jubilee · the year debts were cancelled</div></div></div>
         <p>Yobel is Hebrew for Jubilee: the year debts were cancelled and people went free, announced with the blast of a ram's horn, the shofar. This desk is for the late-night, early-morning grinder making something out of nothing. When a trade closes in profit, the horn sounds.</p></div>
       <div class="grp">Sound</div><div class="list plain"><button class="row" data-act="yosound" style="width:100%;text-align:left"><div class="tx"><div class="t1">Shofar on a win</div><div class="t2">A soft horn when a trade closes in profit · off by default</div></div><span class="switch ${window.Yobel && Yobel.soundOn() ? "on" : ""}"></span></button></div>
-      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Yobel works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
+      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">Yobel — how it works</div><div class="t2">The 5 bots, safety rules and Starship, in plain English</div></div><span class="ter">›</span></button></div>
       <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
       <div class="grp">Notifications</div><div class="list plain">
@@ -922,13 +947,14 @@
     else if (act === "invite") invite();
     else if (act === "closesheet") closeSheet();
     else if (act === "fxdemo") fxDemo();
+    else if (act === "fs") { const r = window.Yobel ? Yobel.fullscreen() : "unsupported"; if (r === "unsupported") toast("On iPhone: tap Share, then Add to Home Screen, for full screen"); }
     else if (act === "yosound") { if (window.Yobel) { Yobel.setSound(!Yobel.soundOn()); render(true); } }
     else if (act === "mode") openMode(t.dataset.m);
     else if (act === "replay") Replay.open();
     else if (act === "rptrade") Replay.open({ mint: t.dataset.mint });
     else if (act === "guide") openGuide();
   });
-  function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 1800); }
+  function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.remove("out"); el.hidden = false; el.onclick = () => { el.hidden = true; }; clearTimeout(toast.t); clearTimeout(toast.u); const ms = Math.max(2200, Math.min(6000, 1400 + String(msg).length * 55)); toast.t = setTimeout(() => { el.classList.add("out"); toast.u = setTimeout(() => { el.hidden = true; el.classList.remove("out"); }, 400); }, ms); }
   async function invite() {
     const u = fomoLink(S.files.account && S.files.account.invite_url); if (!u) return;
     if (navigator.share) { try { await navigator.share({ title: "FOMO", url: u }); return; } catch (e) { if (e.name === "AbortError") return; } }
@@ -1490,7 +1516,7 @@
   function openGuide() {
     if ($("#guidev")) return;
     const d = document.createElement("div"); d.id = "guidev"; d.className = "guidev";
-    d.innerHTML = `<div class="gbar"><button data-gclose>✕ Close</button><b>How Yobel works</b><a href="guide.html" target="_blank" rel="noopener">Open ↗</a></div><iframe src="guide.html" title="Yobel guide"></iframe>`;
+    d.innerHTML = `<div class="gbar"><button data-gclose>✕ Close</button><b>Yobel — how it works</b><a href="guide.html" target="_blank" rel="noopener">Open ↗</a></div><iframe src="guide.html" title="Yobel guide"></iframe>`;
     d.querySelector("[data-gclose]").onclick = () => { d.remove(); if (history.state && history.state.guide) history.back(); };
     document.body.appendChild(d); history.pushState({ d: S.stack.length, guide: 1 }, "");
   }
@@ -1504,7 +1530,7 @@
     const h = location.hash.slice(1).split("&").filter((x) => x && x !== "fx=demo").join("&");
     history.replaceState(history.state, "", location.pathname + location.search + (h ? "#" + h : ""));
   }
-  const DEMO = { buy: ["Buy", "violet pulse"], tp: ["Win", "gold shofar burst"], stop: ["Stop loss", "rose pulse + shake"], sell: ["Exit", "violet ring"] };
+  const DEMO = { buy: ["Buy", "bronze pulse"], tp: ["Win", "gold shofar burst"], stop: ["Stop loss", "rose pulse + shake"], sell: ["Exit", "violet ring"] };
   const demoRow = () => `<div class="prow gain demo" id="demorow"><div class="pic">★</div>
       <div class="ptx"><div class="psym">SAMPLE <span class="tag demo">PREVIEW</span></div><div class="psub">Not a real position · no trade</div></div>
       <div class="ppl"><div class="pval">$0.00</div><div class="pchg mut">effects demo</div></div></div>`;
@@ -1686,7 +1712,7 @@
     if (!inTelegram()) return;
     const w = await loadTelegram(); if (!w || !w.initData) return;
     S.tg = w; document.documentElement.classList.add("tg");
-    try { w.ready(); w.expand(); w.setHeaderColor("#060714"); w.setBackgroundColor("#04050f"); if (w.setBottomBarColor) w.setBottomBarColor("#04050f"); } catch {}
+    try { w.ready(); w.expand(); w.setHeaderColor("#0f0c08"); w.setBackgroundColor("#0b0906"); if (w.setBottomBarColor) w.setBottomBarColor("#0b0906"); } catch {}
     const tp = w.themeParams || {}; if (tp.link_color) document.documentElement.style.setProperty("--tg-link", tp.link_color);   // light touch: links only, our dark-teal stays
     try { w.BackButton.onClick(() => history.back()); } catch {}
     if (!DeskCrypto.dataPath()) {      // the webview has no #d= link: the desk hands the data key to a validated initData session (memory only)

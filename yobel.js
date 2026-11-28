@@ -5,7 +5,7 @@ const Yobel = (() => {
   "use strict";
   let B = {};                                                    // bridge from app.js: { refresh, go, tab, canSwipe, tabs }
   const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const GOLD = ["#fff0c2", "#f5c76b", "#e2b649", "#ffd98a", "#ffffff"], VIOLET = ["#a78bfa", "#8b5cf6", "#c4b5fd", "#d946ef", "#ffffff"], ROSE = ["#ff5c7a", "#ff8aa0", "#ffd0d8", "#8b5cf6"];
+  const GOLD = ["#fff0c2", "#f5c76b", "#e2b649", "#ffd98a", "#ffffff"], VIOLET = ["#e2c38d", "#dbb470", "#eadfc8", "#d6a859", "#ffffff"], ROSE = ["#ff5c7a", "#ff8aa0", "#ffd0d8", "#dbb470"];
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l2.3 7.2 7.2 2.3-7.2 2.3L12 20.5l-2.3-7.2-7.2-2.3 7.2-2.3z" fill="currentColor"/><path d="M19 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="currentColor" opacity=".7"/></svg>';
 
   // ---------- sky: night purple; 05:00-08:00 Berlin the hero and the page warm to sunrise ----------
@@ -159,10 +159,50 @@ const Yobel = (() => {
     if (win) shofar();
   }
 
+
+  // ---------- full screen (Fullscreen API where it exists; iPhone Safari has none, so we explain instead) ----------
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+  const fsApi = () => { const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen); };
+  const standalone = () => matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || navigator.standalone === true;
+  const fsShow = () => fsApi() || !standalone();                       // an installed iPhone app is already full screen: no button
+  function fullscreen() {
+    const d = document, el = d.documentElement;
+    if (fsEl()) { try { (d.exitFullscreen || d.webkitExitFullscreen).call(d); } catch {} return "exit"; }
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) return "unsupported";
+    try { const r = req.call(el); if (r && r.catch) r.catch(() => {}); } catch { return "unsupported"; }
+    return "enter";
+  }
+  function fsSync() { document.documentElement.classList.toggle("yo-fs", !!fsEl()); }
+  // ---------- scroll reveal: sections below the fold fade up once as they come into view (IntersectionObserver: touch + mouse + keyboard scroll alike) ----------
+  function reveal() {
+    const v = document.getElementById("view"); if (!v || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("yo-rv-in"); io.unobserve(e.target); } }), { rootMargin: "0px 0px -6% 0px", threshold: 0.04 });
+    let q = 0;
+    const scan = () => { q = 0; if (reduce()) return;
+      v.querySelectorAll(".home > section, .trrow, .list > .row").forEach((el) => {
+        if (el.dataset.rv) return; el.dataset.rv = "1";
+        if (el.getBoundingClientRect().top < innerHeight * 0.96) return;       // already on screen (or above): never hide
+        el.classList.add("yo-rv"); io.observe(el);
+      }); };
+    new MutationObserver(() => { if (!q) q = requestAnimationFrame(scan); }).observe(v, { childList: true, subtree: true });
+    scan();
+  }
+  // ---------- keyboard (desktop): ← / → switch tab, F toggles full screen ----------
+  function keys() {
+    document.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName) || document.getElementById("rpv")) return;
+      if (e.key === "f" || e.key === "F") { if (fsShow()) { fullscreen(); } return; }
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && B.go && B.canSwipe && B.canSwipe()) {
+        const tabs = B.tabs || [], i = tabs.indexOf(B.tab()), n = i + (e.key === "ArrowRight" ? 1 : -1); if (i >= 0 && n >= 0 && n < tabs.length) B.go(tabs[n]);
+      }
+    });
+  }
   function init(bridge) {
     B = bridge || {}; sky(); setInterval(sky, 60000); document.addEventListener("visibilitychange", () => { if (!document.hidden) sky(); });
     initGestures(); document.addEventListener("pointerdown", unlock, { once: false, passive: true });
+    reveal(); keys(); ['fullscreenchange', 'webkitfullscreenchange'].forEach((n) => document.addEventListener(n, fsSync));
   }
-  return { init, burst, shofar, soundOn, setSound, countText, tagline, sky, dawnAmount, STAR };
+  return { init, fullscreen, fsShow, burst, shofar, soundOn, setSound, countText, tagline, sky, dawnAmount, STAR };
 })();
 if (typeof window !== "undefined") window.Yobel = Yobel;

@@ -8,11 +8,11 @@ const Charts = (() => {
     const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
     return { g, w, h };
   }
-  const MARK = { bought: "#885af4", sold: "#f7c761", stopped: "#ff453a" };
+  const MARK = { bought: "#dab26d", sold: "#f7c761", stopped: "#ff453a" };
 
   // Home balance chart: green line, gradient under it, dashed start line, marks above the line (rows, never overlap)
   // opts (replay only): { upto: ts, t0, t1, events: [{ts, kind}] } draws the line up to `upto` with a playhead; the scale stays the full range
-  const EVC = { buy: "#f7c967", tp: "#f7cc6e", stop: "#ff4d6d", sell: "#9064f5" };
+  const EVC = { buy: "#f7c967", tp: "#f7cc6e", stop: "#ff4d6d", sell: "#ddb775" };
   function line(cv, data, prev, opts) {
     const all = (data && data.points) || [], start = data && data.start_value;
     const draw = (shift) => {
@@ -31,10 +31,10 @@ const Charts = (() => {
       const Y = (v) => top + (h - top - bot) * (1 - (v - lo) / (hi - lo));
       const dp = hi - lo < 10 ? 2 : 0, fmtV = (v) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
       g.save(); g.font = "600 10px ui-monospace,SFMono-Regular,Menlo,monospace"; g.textBaseline = "middle"; g.textAlign = "left";
-      for (let i = 0; i < 4; i++) { const v = lo + (hi - lo) * (i + 0.5) / 4, y = Y(v); g.strokeStyle = "rgba(162,125,247,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR + 4, y); g.stroke(); g.fillStyle = "rgba(175,143,248,.42)"; g.fillText(fmtV(v), w - padR + 8, y); }
+      for (let i = 0; i < 4; i++) { const v = lo + (hi - lo) * (i + 0.5) / 4, y = Y(v); g.strokeStyle = "rgba(226,194,139,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR + 4, y); g.stroke(); g.fillStyle = "rgba(226,195,141,.42)"; g.fillText(fmtV(v), w - padR + 8, y); }
       g.restore();
       if (start != null) {
-        g.save(); g.setLineDash([4, 5]); g.strokeStyle = "rgba(236,236,248,0.3)"; g.lineWidth = 1;
+        g.save(); g.setLineDash([4, 5]); g.strokeStyle = "rgba(249,244,235,0.3)"; g.lineWidth = 1;
         g.beginPath(); g.moveTo(0, Y(start)); g.lineTo(w, Y(start)); g.stroke(); g.restore();
       }
       g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))));
@@ -47,10 +47,10 @@ const Charts = (() => {
       { const up = start == null || lp[1] >= start, txt = fmtV(lp[1]); g.save(); g.font = "700 10px ui-monospace,SFMono-Regular,Menlo,monospace"; g.textBaseline = "middle"; const tw = Math.min(padR - 2, g.measureText(txt).width + 8), ty = Math.min(h - 10, Math.max(top - 6, Y(lp[1])));
         g.fillStyle = up ? "#ff9752" : "#ff5c7a"; g.beginPath(); g.roundRect ? g.roundRect(w - padR + 3, ty - 8, tw, 16, 3) : g.rect(w - padR + 3, ty - 8, tw, 16); g.fill(); g.fillStyle = "#1a1204"; g.fillText(txt, w - padR + 7, ty + 0.5); g.restore(); }
       if (opts) {        // replay: playhead + a dot for every trade already played
-        const px = X(opts.upto); g.save(); g.strokeStyle = "rgba(163,127,247,.75)"; g.lineWidth = 1.5; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(px, 30); g.lineTo(px, h); g.stroke(); g.restore();
-        g.fillStyle = "#a37ff7"; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 5, 0, 7); g.fill();
+        const px = X(opts.upto); g.save(); g.strokeStyle = "rgba(226,195,140,.75)"; g.lineWidth = 1.5; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(px, 30); g.lineTo(px, h); g.stroke(); g.restore();
+        g.fillStyle = "#e2c38c"; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 5, 0, 7); g.fill();
         for (const e of opts.events || []) { if (e.ts > opts.upto || e.ts < t0 || e.ts > t1) continue; let vi = all.findIndex((p) => p[0] >= e.ts); if (vi < 0) vi = all.length - 1;
-          g.fillStyle = EVC[e.kind] || "#8e8e93"; g.strokeStyle = "#04050f"; g.lineWidth = 2; g.beginPath(); g.arc(X(e.ts), Y(all[vi][1]), 4.5, 0, 7); g.fill(); g.stroke(); }
+          g.fillStyle = EVC[e.kind] || "#8e8e93"; g.strokeStyle = "#0b0906"; g.lineWidth = 2; g.beginPath(); g.arc(X(e.ts), Y(all[vi][1]), 4.5, 0, 7); g.fill(); g.stroke(); }
       }
       // marks: chips above the line; a later mark moves up a row when it would overlap
       g.font = "600 11px -apple-system, system-ui, sans-serif"; g.textBaseline = "middle";
@@ -79,10 +79,10 @@ const Charts = (() => {
   // replay with no balance line in the range: a plain time axis with the trades on it (no made-up values)
   function timeline(g, w, h, o) {
     const pad = 22, y = h * 0.6, X = (t) => pad + (w - 2 * pad) * (o.t1 === o.t0 ? 1 : (t - o.t0) / (o.t1 - o.t0));
-    g.strokeStyle = "rgba(211,213,237,.18)"; g.lineWidth = 2; g.beginPath(); g.moveTo(pad, y); g.lineTo(w - pad, y); g.stroke();
-    g.strokeStyle = "rgba(163,127,247,.9)"; g.beginPath(); g.moveTo(pad, y); g.lineTo(X(Math.min(o.upto, o.t1)), y); g.stroke();
+    g.strokeStyle = "rgba(238,229,210,.18)"; g.lineWidth = 2; g.beginPath(); g.moveTo(pad, y); g.lineTo(w - pad, y); g.stroke();
+    g.strokeStyle = "rgba(226,195,140,.9)"; g.beginPath(); g.moveTo(pad, y); g.lineTo(X(Math.min(o.upto, o.t1)), y); g.stroke();
     for (const e of o.events || []) { if (e.ts > o.upto) continue; g.fillStyle = EVC[e.kind] || "#8e8e93"; g.beginPath(); g.arc(X(e.ts), y, 5, 0, 7); g.fill(); }
-    const px = X(Math.min(o.upto, o.t1)); g.fillStyle = "#a37ff7"; g.beginPath(); g.arc(px, y, 6, 0, 7); g.fill();
+    const px = X(Math.min(o.upto, o.t1)); g.fillStyle = "#e2c38c"; g.beginPath(); g.arc(px, y, 6, 0, 7); g.fill();
   }
 
   // Coin screen: 1-minute candles from db.prices + orange dashed exit line
@@ -107,9 +107,9 @@ const Charts = (() => {
       g.save(); g.setLineDash([5, 4]); g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, Y(v)); g.lineTo(w, Y(v)); g.stroke(); g.restore();
       g.font = "600 11px -apple-system, system-ui, sans-serif"; g.fillStyle = col; g.textAlign = "right"; g.fillText(label, w - 4, Y(v) - 5); g.textAlign = "left";
     };
-    if (entry) dashed(entry, "rgba(236,236,248,0.3)", "entry");
+    if (entry) dashed(entry, "rgba(249,244,235,0.3)", "entry");
     if (exitLine) dashed(exitLine, "#ff6c0a", "exit");
-    g.fillStyle = "rgba(236,236,248,0.3)"; g.font = "11px -apple-system, system-ui, sans-serif";
+    g.fillStyle = "rgba(249,244,235,0.3)"; g.font = "11px -apple-system, system-ui, sans-serif";
     const tf = (s) => new Date(s * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     g.fillText(tf(data[0][0]), 2, h - 4); g.textAlign = "right"; g.fillText(tf(data[data.length - 1][0]), w - right, h - 4); g.textAlign = "left";
   }
