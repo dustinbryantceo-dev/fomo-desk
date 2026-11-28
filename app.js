@@ -38,7 +38,7 @@
       S.ix = ix; S.state = ix.state; S.lastIxT = ix.t; S.lastOk = Date.now(); S.err = null;
       try { localStorage.setItem("desk.last", JSON.stringify({ t: ix.t, state: ix.state })); } catch {}
       if (Date.now() / 1000 - ix.t > STALE_S) S.err = "stale";
-      await Promise.allSettled(["chart/" + S.range, "activity/0", "coins"].map(getFile));
+      await Promise.allSettled(["chart/" + S.range, "activity/0", "coins", "x_trends"].map(getFile));
       try { fxDiff(ix.state, S.files["activity/0"]); } catch {}
       if (ix.files.screen && ix.files.screen !== S.screenVer) loadScreen(ix.files.screen);
     } catch (e) { S.err = e.status === 404 || /no index/.test(e.message) ? "nodata" : "offline"; }
@@ -177,6 +177,25 @@
     return scr.trade_live ? '<span class="fn live"><i></i>Updating every 15s · trade live</span>' : `<span class="fn">Updating every ${scr.published_every_s || 60}s</span>`;
   }
 
+  function xTrendsCard() {
+    const d = S.files["x_trends"], rows = (d && d.rows) || [];
+    if (!rows.length) return `<h2 class="sec">X trends</h2><div class="empty glass"><b>No trending tickers right now</b>Names mentioned on X in the last couple of hours will show up here, with the desk's verdict.</div>`;
+    const arrow = (r) => r.dir === "up" ? '<span class="up">↑</span>' : r.dir === "down" ? '<span class="down">↓</span>' : '<span class="mut">→</span>';
+    const men = (r) => (r.mentions != null ? r.mentions : "–");
+    const verdict = (r) => {
+      if (r.verdict === "bought") {
+        const head = r.open ? "Open" : "Bought";
+        const p = [r.pnl_usd != null ? signedMoney(r.pnl_usd) : null, r.pnl_pct != null ? pct(r.pnl_pct) : null].filter(Boolean).join(" · ");
+        return p ? head + " " + p : head;
+      }
+      if (r.verdict === "killed") return "Killed" + (r.reason ? " · " + esc(r.reason) : "");
+      if (r.verdict === "passed") return "Passed";
+      return "Not scanned";
+    };
+    return `<h2 class="sec">X trends <span class="count">· ${rows.length}</span></h2>
+      <div class="xlist tlist glass">${rows.map((r) => `<div class="row xrow" data-act="coin" data-mint="${esc(r.mint)}"><div class="ic">${sym(r.symbol, r.mint).slice(0, 1)}</div><div class="tx"><div class="t1">${sym(r.symbol, r.mint)} <span class="dir">${men(r)} ${arrow(r)}</span>${r.hype ? '<span class="tag hype">⚠ safety</span>' : ""}</div><div class="t2">First ${hm(r.first_ts)} · ${verdict(r)}</div></div><div class="rv">${fomoA(r.link, "FOMO")}</div></div>`).join("")}</div>`;
+  }
+
   function viewHome() {
     const st = S.state, a = (S.files["activity/0"] || { rows: [] }).rows, chart = S.files["chart/" + S.range];
     const up = (st.today_pct || 0) >= 0, unseen = a.length && a[0].ts > +(localStorage.getItem("desk.seen") || 0);
@@ -236,6 +255,7 @@
           <h2 class="sec">Recent trades<button class="more" data-act="tab" data-tab="activity">See all</button></h2>
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
+        <section class="a-xtr">${xTrendsCard()}</section>
         <section class="a-guide"><button class="guidecard glass" data-act="guide"><img src="icons/icon-192.png" alt=""><span class="gt"><b>How Pump Pilot works</b><span>The 5 bots, PAPER vs LIVE, stops and take profit, in one guide</span></span><span class="go">›</span></button></section>
         <section class="a-feed">
           <h2 class="sec">Live feed <span class="count">· buys, sells, skips</span></h2>
@@ -733,7 +753,7 @@
     else if (top && top.kind === "starship") html = viewStarship();
     else if (top && top.kind === "skips") { ensure("skips"); html = viewSkips(); }
     else if (top && top.kind === "skip") { ensure("skips"); html = viewSkip(top.mint); }
-    else if (S.tab === "home") html = viewHome();
+    else if (S.tab === "home") { ensure("x_trends"); html = viewHome(); }
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); ensure("skips"); html = viewBots(); }
     else if (S.tab === "activity") { ensure("skips"); html = viewActivity(); }
     else if (S.tab === "account") { ensure("account"); ensure("settings"); html = viewAccount(); }

@@ -233,13 +233,13 @@ body::before{content:"";position:fixed;inset:-20vh -20vw;z-index:-1;pointer-even
 @keyframes blink{50%{opacity:.25}}
 
 /* layout: one column on the phone, a trading grid on desktop */
-.home{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);grid-template-areas:"hero" "bots" "pos" "frame" "trades" "feed"}
-.home>section{min-width:0} .hero{grid-area:hero}.a-bots{grid-area:bots}.a-pos{grid-area:pos}.a-frame{grid-area:frame}.a-trades{grid-area:trades}.a-feed{grid-area:feed}
+.home{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);grid-template-areas:"hero" "bots" "pos" "frame" "trades" "xtr" "feed"}
+.home>section{min-width:0} .hero{grid-area:hero}.a-bots{grid-area:bots}.a-pos{grid-area:pos}.a-frame{grid-area:frame}.a-trades{grid-area:trades}.a-xtr{grid-area:xtr}.a-feed{grid-area:feed}
 .home h2.sec{margin:6px 2px 10px;font-size:17px;letter-spacing:.2px;align-items:center;min-height:28px}
 .home h2.sec .more{min-height:28px}
 @media (min-width:900px){
   #view{padding-left:28px;padding-right:28px}
-  .home{gap:18px 22px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"hero frame" "bots bots" "pos trades" "feed trades"}
+  .home{gap:18px 22px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"hero frame" "bots bots" "pos trades" "xtr trades" "feed trades"}
   .balance{font-size:76px!important}
   .tabbar{left:50%;right:auto;transform:translateX(-50%);bottom:14px;width:420px;border-radius:22px;border:1px solid var(--glass-b);padding:4px 8px}
   #view{padding-bottom:110px}
@@ -429,13 +429,19 @@ h2.sec .count{font-weight:450}
 
 /* guide card (Home) */
 .a-guide{grid-area:guide}
+.a-xtr{grid-area:xtr}
+.xlist{border-radius:var(--r-lg);overflow:hidden}
+.xrow{min-height:44px;padding:8px 14px;gap:10px}
+.xrow .ic{width:28px;height:28px;font-size:12px}
+.xrow .dir{font-weight:700;font-variant-numeric:tabular-nums}
+.tag.hype{color:#ffb547;background:rgba(255,181,71,.16);margin-left:6px}
 .guidecard{display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;padding:var(--sp-3) var(--sp-4);border-radius:var(--r-lg);cursor:pointer}
 .guidecard img{width:44px;height:44px;border-radius:12px;flex:none;object-fit:cover;border:1px solid rgba(25,230,193,.35);background:#071114}
 .guidecard .gt{flex:1;min-width:0}.guidecard b{display:block;font:650 var(--fs-md)/1.25 var(--font)}
 .guidecard span{display:block;font-size:var(--fs-sm);color:var(--sec);margin-top:2px}
 .guidecard .go{color:var(--teal);font-size:22px;line-height:1}
-.home{grid-template-areas:"hero" "bots" "pos" "frame" "trades" "feed" "guide"}
-@media (min-width:900px){.home{grid-template-areas:"hero frame" "bots bots" "pos trades" "feed trades" "guide trades"}}
+.home{grid-template-areas:"hero" "bots" "pos" "frame" "trades" "xtr" "feed" "guide"}
+@media (min-width:900px){.home{grid-template-areas:"hero frame" "bots bots" "pos trades" "xtr trades" "feed trades" "guide trades"}}
 .guidev{position:fixed;inset:0;z-index:55;background:var(--bg);display:flex;flex-direction:column}
 .guidev .gbar{display:flex;align-items:center;gap:var(--sp-2);padding:calc(var(--st) + 6px) calc(12px + var(--sr)) 8px calc(12px + var(--sl));border-bottom:1px solid var(--card-b);background:rgba(6,12,14,.92)}
 .guidev .gbar b{flex:1;font:650 var(--fs-lg) var(--font)}
