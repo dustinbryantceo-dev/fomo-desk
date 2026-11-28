@@ -90,27 +90,32 @@ const Replay = (() => {
     mount(); R = { view: "pick", playing: false };
     root.innerHTML = bar("Replay", "") + `<div class="rpscroll"><div class="rpload"><i></i>Loading replay data…</div></div>`;
     const trades = await index(); if (!root) return;
-    R.trades = trades;
+    R.trades = trades; R.all = trades;      // R.all = every published trade; R.trades = the trades of the window being played
     if (opts.mint) { const t = trades.find((x) => x.mint === opts.mint); if (t) return openTrade(t.id); }
     if (opts.id) return openTrade(opts.id);
     pick();
   }
   const bar = (title, sub, back) => `<div class="rpbar">${back ? `<button class="rpbk" data-rp="${back}" aria-label="Back">‹ Back</button>` : `<span class="rpbk ph"></span>`}<div class="rpt"><b>${esc(title)}</b>${sub ? `<span>${sub}</span>` : ""}</div><button class="rpx" data-rp="close" aria-label="Close replay">✕</button></div>`;
+  // a trade belongs to a window if it closed inside it (realized P&L) or is still open (it opened inside the window)
+  const inWindow = (t, t0, t1) => (t.t_close ? t.t_close >= t0 && t.t_close <= t1 : t.t_open >= t0 && t.t_open <= t1);
+  function nightStart() {
+    const f = B.S.files, c = f["chart/LIVE"] || f["chart/" + B.S.range] || f["chart/1D"] || Object.values(f).find((v) => v && typeof v === "object" && v.night_start) || {};
+    return c.night_start || 0;
+  }
   function windows(trades) {
-    const now = Date.now() / 1000, ch = B.S.files["chart/LIVE"] || B.S.files["chart/1D"] || {};
-    let ns = ch.night_start; if (!ns || now - ns > 86400 || now - ns < 600) ns = now - 12 * 3600;
-    const mk = (id, title, sub, t0) => { const ts = trades.filter((t) => t.t_open >= t0 && t.t_open <= now), done = ts.filter((t) => t.t_close);
-      return { id, title, sub, t0, t1: now, n: ts.length, net: done.reduce((a, t) => a + (t.pnl_usd || 0), 0), wins: done.filter((t) => (t.pnl_usd || 0) > 0).length, done: done.length }; };
-    return [mk("night", "Last night", `since ${hhmm(ns)} ${zone(ns)}`, ns), mk("24h", "Last 24 hours", "rolling", now - 86400), mk("3d", "Last 3 days", "rolling", now - 3 * 86400)];
+    const now = Date.now() / 1000; let ns = nightStart(); if (!ns || ns > now || now - ns > 90000) ns = now - 12 * 3600;
+    const mk = (id, title, sub, t0) => { const ts = trades.filter((t) => inWindow(t, t0, now)), done = ts.filter((t) => t.t_close);
+      return { id, title, sub, t0, t1: now, n: ts.length, net: done.reduce((a, t) => a + (t.pnl_usd || 0), 0), wins: done.filter((t) => (t.pnl_usd || 0) > 0).length, loss: done.filter((t) => (t.pnl_usd || 0) < 0).length, done: done.length }; };
+    return [mk("night", "Last night", `since ${hhmm(ns)} ${zone(ns)}`, ns), mk("24h", "Last 24 hours", "last 24 h", now - 86400), mk("3d", "Last 3 days", "last 72 h", now - 3 * 86400)];
   }
   function pick() {
-    R.view = "pick"; stop(); const trades = R.trades;
+    R.view = "pick"; stop(); const trades = R.all || R.trades;
     if (!trades.length) { root.innerHTML = bar("Replay", "") + `<div class="rpscroll"><div class="rpempty2"><b>Nothing to replay yet</b>Replays appear here as soon as the desk has published its first trades. If the desk just restarted, give it a minute.</div></div>`; return; }
     const ws = windows(trades);
     root.innerHTML = bar("Replay", "watch the desk trade again") + `<div class="rpscroll">
       <h3 class="rph">Replay a window</h3>
       <div class="rpwins">${ws.map((w) => `<button class="rpwin glass" data-rp="win" data-w="${w.id}" ${w.n ? "" : "disabled"}><div class="wt">${esc(w.title)}<small>${esc(w.sub)}</small></div>
-        <div class="wn">${w.n ? `${w.n} trade${w.n > 1 ? "s" : ""} · ${w.done ? `<b class="${w.net >= 0 ? "up" : "down"}">${signed(w.net)}</b> · ${w.wins}/${w.done} won` : "in progress"}` : "no trades"}</div><span class="wgo">▶</span></button>`).join("")}</div>
+        <div class="wn">${w.n ? `${w.n} trade${w.n > 1 ? "s" : ""} · ${w.done ? `<b class="${w.net >= 0 ? "up" : "down"}">${signed(w.net)}</b> · ${w.wins} won · ${w.loss} lost` : "in progress"}` : "no trades"}</div><span class="wgo">▶</span></button>`).join("")}</div>
       <h3 class="rph">Replay a trade</h3>
       <div class="rptl glass">${trades.map((t) => { const open = !t.t_close, up = (t.pnl_usd || 0) >= 0;
         return `<button class="rptr" data-rp="trade" data-id="${t.id}"><div class="ic">${esc((t.symbol || "?").slice(0, 1))}</div><div class="tx"><div class="t1">${esc(t.symbol || t.mint.slice(0, 4))}${t.starship ? ' <span class="tag ss">✦</span>' : ""}${open ? ' <span class="tag live">OPEN</span>' : ""}</div>
@@ -141,11 +146,11 @@ const Replay = (() => {
     wire(); R.lastStep = -2; play(true);
   }
   async function openWindow(wid, from) {
-    const w = windows(R.trades).find((x) => x.id === wid); if (!w) return;
+    const w = windows(R.all).find((x) => x.id === wid); if (!w) return;
     R.view = "winload"; root.innerHTML = bar(w.title, "", "back") + `<div class="rpscroll"><div class="rpload"><i></i>Loading the balance line…</div></div>`;
     await Promise.allSettled([B.getFile(w.t1 - w.t0 <= 86400 ? "chart/1D" : "chart/1W"), B.getFile("chart/ALL")]);
     if (!root || R.view !== "winload") return;      // the user went back meanwhile
-    const trades = R.trades.filter((t) => t.t_open >= w.t0 && t.t_open <= w.t1).sort((a, b) => a.t_open - b.t_open);
+    const trades = R.all.filter((t) => inWindow(t, w.t0, w.t1)).sort((a, b) => a.t_open - b.t_open);
     const span = w.t1 - w.t0, ch = B.S.files[span <= 86400 ? "chart/1D" : "chart/1W"] || {}, inWin = (c) => ((c && c.points) || []).filter((p) => p[0] >= w.t0 - 600);
     let pts = inWin(ch); if (pts.length < 2) pts = inWin(B.S.files["chart/ALL"]);
     R = Object.assign(R, { view: "window", W: w, trades, playing: false }); R.from = from || null;
