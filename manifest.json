@@ -1,12 +1,12 @@
 {
-  "name": "Pump Pilot",
-  "short_name": "Pump Pilot",
-  "description": "Pump Pilot · FOMO trading desk",
+  "name": "Yobel",
+  "short_name": "Yobel",
+  "description": "Yobel · make something out of nothing",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#04090b",
-  "theme_color": "#04090b",
+  "background_color": "#070818",
+  "theme_color": "#070818",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

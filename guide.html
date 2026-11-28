@@ -1,30 +1,30 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#07090f"><title>Pump Pilot · Desk Guide</title>
-<meta name="description" content="Pump Pilot · FOMO Trading Desk operator's guide">
-<meta property="og:type" content="website"><meta property="og:site_name" content="Pump Pilot">
-<meta property="og:title" content="Pump Pilot · Desk Guide"><meta property="og:description" content="FOMO Trading Desk · Operator's Guide">
+<meta name="theme-color" content="#07081c"><title>Yobel · Desk Guide</title>
+<meta name="description" content="Yobel · operator's guide">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Yobel">
+<meta property="og:title" content="Yobel · Desk Guide"><meta property="og:description" content="Operator's Guide">
 <meta property="og:url" content="https://dustinbryantceo-dev.github.io/fomo-desk/guide.html"><meta property="og:image" content="https://dustinbryantceo-dev.github.io/fomo-desk/guide-og.png?v=3">
-<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Pump Pilot rocket logo">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Yobel shofar logo">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://dustinbryantceo-dev.github.io/fomo-desk/guide-og.png?v=3">
 <link rel="icon" type="image/png" href="guide-icon.png"><link rel="apple-touch-icon" href="guide-icon.png">
 
 <style>
-:root{--bg:#07090f;--panel:rgba(255,255,255,.035);--line:rgba(255,255,255,.08);--txt:#eef2f7;--mut:#8b97a8;--gold:#ffc83d;--grn:#22e584;--red:#ff4d6d;--blu:#4da3ff;--pur:#a78bfa;--cyn:#2ee6d6;--org:#ff8a3d}
+:root{--bg:#060714;--panel:rgba(255,255,255,.035);--line:rgba(255,255,255,.08);--txt:#eff0fa;--mut:#8285b5;--gold:#ff8b3d;--grn:#f7cd70;--red:#ff4d6d;--blu:#966df6;--pur:#a27df7;--cyn:#f8ce74;--org:#ff8a3d}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
 body{margin:0;color:var(--txt);font:16px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;
-background:radial-gradient(1200px 600px at 10% -10%,rgba(34,229,132,.13),transparent 60%),radial-gradient(900px 500px at 100% 0%,rgba(255,200,61,.10),transparent 60%),radial-gradient(800px 600px at 50% 120%,rgba(167,139,250,.10),transparent 60%),var(--bg);background-attachment:fixed}
+background:radial-gradient(1200px 600px at 10% -10%,rgba(247,205,112,.13),transparent 60%),radial-gradient(900px 500px at 100% 0%,rgba(255,139,61,.10),transparent 60%),radial-gradient(800px 600px at 50% 120%,rgba(162,125,247,.10),transparent 60%),var(--bg);background-attachment:fixed}
 main{max-width:920px;margin:0 auto;padding:0 16px 80px}
 .hero{position:relative;text-align:center;padding:56px 16px 34px}
-.logo{display:inline-grid;place-items:center;width:74px;height:74px;border-radius:22px;font-size:38px;background:linear-gradient(135deg,#22e584,#ffc83d);box-shadow:0 0 0 1px rgba(255,255,255,.15) inset,0 18px 50px -10px rgba(34,229,132,.55);animation:float 4s ease-in-out infinite}
+.logo{display:inline-grid;place-items:center;width:74px;height:74px;border-radius:22px;font-size:38px;background:linear-gradient(135deg,#f7cd70,#ff8b3d);box-shadow:0 0 0 1px rgba(255,255,255,.15) inset,0 18px 50px -10px rgba(247,205,112,.55);animation:float 4s ease-in-out infinite}
 @keyframes float{50%{transform:translateY(-6px)}}
-h1{margin:18px 0 4px;font-size:clamp(2.2rem,7vw,3.4rem);letter-spacing:-.03em;font-weight:800;line-height:1.05;background:linear-gradient(90deg,#fff,#22e584 45%,#ffc83d);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{margin:18px 0 4px;font-size:clamp(2.2rem,7vw,3.4rem);letter-spacing:-.03em;font-weight:800;line-height:1.05;background:linear-gradient(90deg,#ffffff,#f7cd70 45%,#ff8b3d);-webkit-background-clip:text;background-clip:text;color:transparent}
 .sub{color:var(--mut);font-size:1.05rem;margin:0}
 .pills{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:18px}
 .pill{font:600 .78rem/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
-.pill.live{color:var(--grn);border-color:rgba(34,229,132,.4);box-shadow:0 0 18px -4px rgba(34,229,132,.6)}
+.pill.live{color:var(--grn);border-color:rgba(247,205,112,.4);box-shadow:0 0 18px -4px rgba(247,205,112,.6)}
 .pill.live:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--grn);margin-right:7px;vertical-align:1px;animation:pulse 1.6s infinite}
 @keyframes pulse{50%{opacity:.25}}
-nav a,.cta{cursor:pointer;-webkit-tap-highlight-color:rgba(34,229,132,.25)}nav{position:sticky;top:0;z-index:5;margin:0 -16px 8px;padding:10px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;background:rgba(7,9,15,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+nav a,.cta{cursor:pointer;-webkit-tap-highlight-color:rgba(247,205,112,.25)}nav{position:sticky;top:0;z-index:5;margin:0 -16px 8px;padding:10px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;background:rgba(6,7,20,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 nav::-webkit-scrollbar{display:none}
 nav a{flex:none;color:var(--txt);text-decoration:none;font-size:.86rem;font-weight:600;padding:7px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--line)}
 nav a:hover{border-color:var(--c,var(--grn))}
@@ -38,13 +38,13 @@ h2{margin:0;font-size:1.3rem;letter-spacing:-.01em}
 h3{font-size:1rem;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
 p{margin:8px 0}.mut{color:var(--mut);font-size:.92rem}
 a{color:var(--blu)}
-code{font:.86em ui-monospace,"SF Mono",Menlo,Consolas,monospace;padding:2px 7px;border-radius:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);color:#e7f6ee;word-break:break-word}
+code{font:.86em ui-monospace,"SF Mono",Menlo,Consolas,monospace;padding:2px 7px;border-radius:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);color:#f9d68b;word-break:break-word}
 .bots{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
 .bot{padding:12px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--line)}
 .bot b{display:block;font-size:.98rem}.bot span{color:var(--mut);font-size:.86rem}
 .cmds{display:grid;gap:8px}
 .cmd{display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:12px;align-items:start;padding:11px 12px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
-.cmd .k{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.cmd .d{color:#cdd5e0;font-size:.94rem}
+.cmd .k{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.cmd .d{color:#cacce7;font-size:.94rem}
 .grp{font:700 .72rem/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:16px 2px 4px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .st{--k:var(--grn);position:relative;padding:16px;border-radius:16px;background:rgba(0,0,0,.3);border:1px solid color-mix(in srgb,var(--k) 35%,transparent);box-shadow:0 0 28px -14px var(--k)}
@@ -58,21 +58,21 @@ code{font:.86em ui-monospace,"SF Mono",Menlo,Consolas,monospace;padding:2px 7px;
 .chip{display:inline-block;font:600 .78rem/1 ui-monospace,monospace;padding:6px 9px;border-radius:8px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}
 ol,ul{margin:6px 0;padding-left:0;list-style:none;counter-reset:n}
 ol li,ul li{position:relative;padding:8px 0 8px 40px;border-bottom:1px dashed var(--line)}ol li:last-child,ul li:last-child{border:0}
-ol li:before{counter-increment:n;content:counter(n);position:absolute;left:0;top:7px;width:27px;height:27px;border-radius:9px;display:grid;place-items:center;font:800 .85rem/1 ui-monospace,monospace;color:#07090f;background:var(--c)}
+ol li:before{counter-increment:n;content:counter(n);position:absolute;left:0;top:7px;width:27px;height:27px;border-radius:9px;display:grid;place-items:center;font:800 .85rem/1 ui-monospace,monospace;color:#060714;background:var(--c)}
 ul li:before{content:"";position:absolute;left:11px;top:17px;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
 .cta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0;padding:14px 16px;border-radius:14px;text-decoration:none;color:var(--txt);background:linear-gradient(135deg,color-mix(in srgb,var(--c) 22%,transparent),rgba(0,0,0,.2));border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
 .cta b{font-size:1.02rem}.cta span{color:var(--c);font-weight:700}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .box{padding:14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid var(--line)}
 .box .big{font:800 1.8rem/1 ui-sans-serif,sans-serif;color:var(--c)}
-.alert{padding:12px 14px;border-radius:12px;background:rgba(255,200,61,.08);border:1px solid rgba(255,200,61,.3);color:#ffe3a1;font-size:.92rem}
+.alert{padding:12px 14px;border-radius:12px;background:rgba(255,139,61,.08);border:1px solid rgba(255,139,61,.3);color:#ffe3a1;font-size:.92rem}
 footer{text-align:center;color:var(--mut);font-size:.85rem;margin-top:30px}
 .s-tg{--c:var(--blu)}.s-rules{--c:var(--red)}.s-chg{--c:var(--gold)}.s-app{--c:var(--grn)}.s-scr{--c:var(--cyn)}.s-use{--c:var(--pur)}.s-safe{--c:var(--org)}.s-fix{--c:var(--mut)}
 @media(max-width:620px){.cmd{grid-template-columns:1fr;gap:6px}.row{grid-template-columns:1fr 1fr}.row .ok{grid-column:1/-1}.row.hd{display:none}.duo{grid-template-columns:1fr}section{padding:20px 16px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
-@media print{body{background:#07090f;-webkit-print-color-adjust:exact;print-color-adjust:exact}nav{display:none}section{break-inside:avoid}}
+@media print{body{background:#060714;-webkit-print-color-adjust:exact;print-color-adjust:exact}nav{display:none}section{break-inside:avoid}}
 </style></head><body><main>
-<header class="hero"><div class="logo">🚀</div><h1>Pump Pilot</h1><p class="sub">FOMO Trading Desk · Operator's Guide</p>
+<header class="hero"><div class="logo"><img src="icons/icon-192.png" alt="" style="width:100%;height:100%;border-radius:inherit;display:block"></div><h1>Yobel</h1><p class="sub">Jubilee · the year debts were cancelled and people went free, announced by the shofar.<br>The desk for the late-night grinder making something out of nothing. Operator's Guide.</p>
 <div class="pills"><span class="pill live">Live</span><span class="pill">5 bots</span><span class="pill">24/7</span><span class="pill">Telegram control</span></div></header>
 <nav><a href="#what">🤖 Bots</a><a href="https://t.me/DaddyDK_fomodesk_bot" target="_blank" rel="noopener">💬 Telegram ↗</a><a href="#rules">🛡️ Rules</a><a href="#change">🎛️ Change rules</a><a href="https://dustinbryantceo-dev.github.io/fomo-desk/" target="_blank" rel="noopener">📊 Web app ↗</a><a href="http://127.0.0.1:6080/vnc.html?autoconnect=1&amp;resize=scale" target="_blank" rel="noopener">🖥️ Live screen ↗</a><a href="grokbot://app/v1/settings?id=usage">⚡ Usage ↗</a><a href="#safety">🔒 Safety</a><a href="#trouble">🧰 Fixes</a></nav>
 
@@ -132,7 +132,7 @@ footer{text-align:center;color:var(--mut);font-size:.85rem;margin-top:30px}
 <p class="mut">You can write the value as 20, 20% or −20%; all mean a 20% stop. To check a value, send <code>status</code>. The window times only matter while <code>/time on</code> is active.</p></section>
 
 <section id="app" class="s-app"><div class="h"><div class="ic">📊</div><div><span class="kick">Dashboard</span><h2>The web app</h2></div></div>
-<a class="cta" target="_blank" rel="noopener" href="https://dustinbryantceo-dev.github.io/fomo-desk/"><b>📈 Open the Pump Pilot dashboard</b><span>Open →</span></a>
+<a class="cta" target="_blank" rel="noopener" href="https://dustinbryantceo-dev.github.io/fomo-desk/"><b>📈 Open the Yobel dashboard</b><span>Open →</span></a>
 <p class="mut">On iPhone, open it in Safari, tap Share, then <b>Add to Home Screen</b> to get a full-screen app.</p>
 <div class="duo"><div class="box"><div class="big">15s</div><b>🔥 During a trade</b><div class="mut">An order in progress or placed in the last 2 minutes. The screen picture updates every 15 seconds.</div></div>
 <div class="box"><div class="big">60s</div><b>😴 When it's quiet</b><div class="mut">The screen picture updates every 60 seconds. Balance, positions and trades refresh every 15 seconds.</div></div></div>
@@ -168,7 +168,7 @@ footer{text-align:center;color:var(--mut);font-size:.85rem;margin-top:30px}
 <li>The server has 4 GB of extra swap memory so it doesn't run out of memory.</li>
 <li>Private screen won't load? Check that the Termius rule is active and the username is lowercase <code>bot</code>.</li></ul>
 <div class="alert">⚠️ Trading meme coins is high risk. The bots follow your rules, but they can't prevent losses.</div></section>
-<footer>🚀 Pump Pilot · updated 15 Nov 2026</footer>
+<footer>✦ Yobel · updated 15 Nov 2026</footer>
 </main><script>
 document.querySelectorAll('a[href^="#"]').forEach(function(a){a.addEventListener('click',function(e){var t=document.getElementById(a.getAttribute('href').slice(1));if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'});history.replaceState(null,'',a.getAttribute('href'));}});});
 </script></body></html>

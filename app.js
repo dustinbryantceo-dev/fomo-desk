@@ -1,4 +1,4 @@
-// app.js - Pump Pilot, the desk on the iPhone (STEP 10, restyled 2026-11-15), hosting plan B (DECISIONS #26).
+// app.js - Yobel, the desk on the iPhone (STEP 10, restyled 2026-11-15), hosting plan B (DECISIONS #26).
 // Reads encrypted files from the public repo with desk-crypto.js, polls every 15 s (no SSE).
 // Live prices (MEM-20): between those polls the app asks DexScreener's public API for the prices of the open positions (every 2.5 s while the tab is visible)
 // and recomputes value / P&L / stop distance here from the entry price and tokens in the payload. No secrets, no desk load; Jupiter price is the fallback.
@@ -8,7 +8,7 @@
   const POLL_S = 15, STALE_S = 60;
   const BOT_ORDER = ["scanner", "analyst", "brain", "executor", "risk"];
   const $ = (s, el = document) => el.querySelector(s);
-  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const esc = (v) => String(v ?? "").replace(/\u{1F680}/gu, "\u2726").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fomoLink = (u) => (!S.viewer && typeof u === "string" && /^https:\/\/fomo\.family\//.test(u) ? u : null); // check only, never build
   const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -215,7 +215,7 @@
   }
   function lvPaint() {
     lvChip(); const st = S.state; if (!st) return;
-    const set = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
+    const set = (el, t) => { if (!el || el.textContent === t) return; if (window.Yobel) Yobel.countText(el, t); else el.textContent = t; };
     for (const p of st.positions || []) {
       const row = document.querySelector(`.prow[data-mint="${p.mint}"]`); if (!row) continue;
       const L = posLive(p), up = (L.chg || 0) >= 0;
@@ -272,7 +272,7 @@
     const m = S.state && S.state.maint;
     if (!m || (m.state !== "updating" && S.maintSeen === String(m.ts))) { el.hidden = true; return; }
     const left = m.eta_ts ? Math.ceil((m.eta_ts * 1000 - Date.now()) / 60000) : null;
-    const txt = m.state === "updating" ? `🛠️ Updating… ${m.what || "Pump Pilot"} · ${left == null ? "back soon" : left > 0 ? `back in ~${left} min` : "almost done"}`
+    const txt = m.state === "updating" ? `🛠️ Updating… ${m.what || "Yobel"} · ${left == null ? "back soon" : left > 0 ? `back in ~${left} min` : "almost done"}`
       : m.state === "done" ? `Updated ✓${m.version ? " · " + m.version : ""}` : "⚠️ Update not confirmed · the desk is being checked";
     el.className = "maint " + m.state; el.dataset.k = m.state; el.dataset.ts = String(m.ts);
     if (el.textContent !== txt) el.textContent = txt; el.hidden = false;
@@ -303,8 +303,10 @@
       ${sk(24, "40%", 8, 26)}<div style="display:flex;gap:10px">${sk(170, "76%", 16)}${sk(170, "24%", 16)}</div>`;
   }
 
-  // ---------- Pump Pilot: home ----------
-  const LOGO = '<img src="rocket-logo.png" class="pplogo" alt="">';
+  // ---------- Yobel: home ----------
+  const LOGO = '<img src="icons/icon-192.png" class="pplogo" alt="Yobel">';
+  const STAR = (window.Yobel && Yobel.STAR) || "\u2726";
+  const yoTag = () => (window.Yobel ? Yobel.tagline() : "late night grind");
   // desk up = fresh data from the last poll; otherwise the badge says STANDBY (never "offline")
   const deskUp = () => !!S.state && !S.err;
   const modeBadge = () => { const m = S.state && S.state.mode; if (S.state && !deskUp()) return '<span class="mbadge standby"><i></i>STANDBY</span>'; return m === "LIVE" ? '<span class="mbadge live"><i></i>LIVE</span>' : m === "PAPER" ? '<span class="mbadge paper">PAPER</span>' : ""; };
@@ -332,7 +334,7 @@
   }
   function posCard(p) {
     const L = posLive(p), upp = (L.chg || 0) >= 0;
-    const tags = (p.starship ? '<span class="tag ss">🚀 STARSHIP</span>' : "") + (p.tp_done ? '<span class="tag tp">TP HIT</span>' : "") + (p.trail_active ? '<span class="tag sell">TRAILING</span>' : "");
+    const tags = (p.starship ? '<span class="tag ss">✦ STARSHIP</span>' : "") + (p.tp_done ? '<span class="tag tp">TP HIT</span>' : "") + (p.trail_active ? '<span class="tag sell">TRAILING</span>' : "");
     return `<div class="prow ${upp ? "gain" : "loss"}" data-act="coin" data-mint="${esc(p.mint)}">
       <div class="pic">${sym(p.symbol, p.mint).slice(0, 1)}</div>
       <div class="ptx"><div class="psym">${sym(p.symbol, p.mint)} ${tags}</div><div class="psub">${money(p.size_usd)} in · stop ${priceFmt(p.stop_price)}${p.opened_at ? " · " + hm(p.opened_at) : ""}</div><div class="psub plv">${esc(stopLine(p, L))}</div></div>
@@ -370,7 +372,7 @@
     const running = (st.bots || []).filter((b) => b.status === "running" || b.status === "degraded").length;
     return `
       <header class="pphead">
-        <div class="brand">${LOGO}<div><div class="bname">Pump <span>Pilot</span></div><div class="btag">FOMO desk · ${running}/5 bots online</div></div></div>
+        <div class="brand">${LOGO}<div><div class="bname">Yobel</div><div class="btag"><b>${yoTag()}</b> · ${running}/5 online</div></div></div>
         <div class="navsp"></div>${S.viewer ? '<span class="vbadge">👀 VIEW ONLY</span>' : ""}<span id="mbadge">${modeBadge()}</span>
         ${canCtl() ? `<button class="iconbtn ${pausedNow().size ? "paused" : ""}" data-act="bots" aria-label="Pause or resume bots">${pausedNow().size ? ICON.play : ICON.pause}${pausedNow().size ? '<i class="dot amber"></i>' : ""}</button>` : ""}
         <button class="iconbtn" data-act="search" aria-label="Search">${ICON.search}</button>
@@ -419,7 +421,7 @@
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
         <section class="a-xtr">${xTrendsCard()}</section>
-        <section class="a-guide"><button class="guidecard glass" data-act="guide"><img src="icons/icon-192.png" alt=""><span class="gt"><b>How Pump Pilot works</b><span>The 5 bots, PAPER vs LIVE, stops and take profit, in one guide</span></span><span class="go">›</span></button></section>
+        <section class="a-guide"><button class="guidecard glass" data-act="guide"><img src="icons/icon-192.png" alt=""><span class="gt"><b>How Yobel works</b><span>The 5 bots, PAPER vs LIVE, stops and take profit, in one guide</span></span><span class="go">›</span></button></section>
         <section class="a-feed">
           <h2 class="sec">Live feed <span class="count">· buys, sells, skips</span></h2>
           ${a.length ? `<div class="feed glass">${a.slice(0, 12).map(feedRow).join("")}</div>` : '<div class="empty glass">Nothing yet tonight</div>'}
@@ -427,7 +429,7 @@
       </div>`;
   }
 
-  // ---------- Pump Pilot: balance tween (ease-out 900 ms; reduced motion = set) ----------
+  // ---------- Yobel: balance tween (ease-out 900 ms; reduced motion = set) ----------
   function tween(el, to) {
     if (to == null || isNaN(to)) { el.textContent = "–"; el.dataset.n = ""; return; }
     const from = el.dataset.n === undefined || el.dataset.n === "" ? null : +el.dataset.n;
@@ -440,8 +442,8 @@
     el._raf = requestAnimationFrame(step);
   }
 
-  // ---------- Pump Pilot: trade effects, from diffing activity rows + positions between polls ----------
-  // buy -> rocket launch + blue glow; take-profit (or tp_done 0->1) -> rocket detonates into a teal firework + teal edge glow; stop -> rocket stalls, tumbles, crashes + red sparks/edge glow + shake; sell -> rocket landing + blue puff
+  // ---------- Yobel: trade effects, from diffing activity rows + positions between polls ----------
+  // buy -> violet pulse; winning close (take profit, or a stop / exit in profit) -> gold shofar burst + gold edge; loss -> rose pulse + shake; sell -> violet ring
   const FX = { seen: null, pos: null, queue: [] };
   function fxDiff(state, act) {
     const rows = (act && act.rows) || [], pos = Object.fromEntries(((state && state.positions) || []).map((p) => [p.mint, p]));
@@ -451,7 +453,7 @@
     for (const r of rows.slice().reverse()) {
       if (FX.seen.has(r.id)) continue; FX.seen.add(r.id);
       const kind = r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : "sell") : null;
-      if (kind) { out.push({ kind, mint: r.mint, aid: r.id }); hit.add(kind + r.mint); }
+      if (kind) { out.push({ kind, mint: r.mint, aid: r.id, win: (r.kind === "sold" || r.kind === "stopped") && !/^-/.test(String(r.value || "")) }); hit.add(kind + r.mint); }
     }
     for (const [m, p] of Object.entries(pos)) {
       const o = FX.pos[m];
@@ -465,143 +467,32 @@
     if (S.tab !== "home" || S.stack.length) { FX.queue.length = 0; return; }   // only play on Home, never replay old ones later
     const q = FX.queue.splice(0).slice(-3); const calm = reduce();
     q.forEach((e, i) => setTimeout(() => {
+      const fk = e.kind === "tp" || (e.win && e.kind !== "buy") ? "tp" : e.kind;
       const targets = [...document.querySelectorAll(`.prow[data-mint="${CSS.escape(e.mint || "")}"]`), ...document.querySelectorAll(`.trow[data-aid="${CSS.escape(String(e.aid ?? "-"))}"]`)];
       const hero = $("#hero"); const all = targets.length ? targets : hero ? [hero] : [];
       if (e.kind !== "buy" && hero && !all.includes(hero)) all.push(hero);
-      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + e.kind); setTimeout(() => el.classList.remove("fx-" + e.kind), 2400); });
+      all.forEach((el) => { el.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void el.offsetWidth; el.classList.add("fx-" + fk); setTimeout(() => el.classList.remove("fx-" + fk), 2400); });
       banner(e);
       const vis = all.find((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
       if (!calm) {
         const row = targets.find((el) => el === vis) || vis || hero;
         const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
-        arcade(e.kind, e.kind === "tp" ? (hero || row) : row, e.kind === "stop" ? shake : null);
+        arcade(fk, fk === "tp" ? (hero || row) : row, fk === "stop" ? shake : null);
       }
     }, i * 700));
   }
   function banner(e) {
-    const t = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Exit" }[e.kind];
+    const t = e.win && e.kind === "stop" ? "Stop hit, in profit" : e.win && e.kind === "sell" ? "Exit in profit" : { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Exit" }[e.kind];
     const p = (S.state.positions || []).find((x) => x.mint === e.mint);
     const r = ((S.files["activity/0"] || {}).rows || []).find((x) => x.id === e.aid || (e.aid == null && x.mint === e.mint));
     const s = (p && p.symbol) || (r && (r.title || "").split(" ").slice(1).join(" ")) || (e.mint || "").slice(0, 4);
-    const el = document.createElement("div"); el.className = "ppban " + e.kind;
+    const el = document.createElement("div"); el.className = "ppban " + (e.win && e.kind !== "buy" ? "tp" : e.kind);
     el.innerHTML = `<b>${esc(t)}</b> ${esc(s)}${r && r.value ? ` <span>${esc(String(r.value).split(" · ")[0])}</span>` : ""}`;
     document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 2600); setTimeout(() => el.remove(), 3200);
   }
-  // ---------- Pump Pilot arcade effects: one canvas overlay per effect, rAF, removed after ~2 s (fire-and-forget) ----------
-  // The rocket is the SVG above, pre-rendered once per colour into an offscreen bitmap (cached), so a frame is one drawImage.
-  // buy = GREEN rocket launch; tp = original teal rocket + teal firework; stop = red rocket stalls, tumbles, red fire explosion + shake;
-  // sell = any other exit (plain or trailing) = BLUE rocket landing. Teal edge glow on TP, no gold anywhere.
-  // Tinted rockets are pre-rendered PNGs (only the saturated tip/fins/flame recoloured, silver body untouched): no CSS/canvas filters.
-  const RKT = {}, RC = { buy: "#00e676", tp: "#19e6c1", stop: "#ff4d6d", sell: "#2f7bff" }, RC2 = { buy: "#69f0ae", tp: "#00f5a0", stop: "#ff8a8a", sell: "#00c2ff" };
-  const RIMG = { buy: "rocket-green.png", tp: "rocket-real.png", stop: "rocket-red.png", sell: "rocket-blue.png" };
-  const RGLOW = { buy: "105,240,174", tp: "120,220,255", stop: "255,120,120", sell: "90,150,255" };
-  function rocketSprite(kind = "tp") {
-    const f = RIMG[kind] || RIMG.tp, o = RKT[f]; if (o) return o.ready ? o : null;
-    const n = (RKT[f] = { ready: false }); const im = new Image();
-    im.onload = () => { const c = document.createElement("canvas"); c.width = 384; c.height = 384; c.getContext("2d").drawImage(im, 0, 0, 384, 384); Object.assign(n, { bmp: c, ready: true }); };
-    im.onerror = () => { delete RKT[f]; }; im.src = f;
-    return null;
-  }
-  const warmRockets = () => Object.keys(RIMG).map(rocketSprite).every(Boolean);
-  setTimeout(() => { if (!reduce()) warmRockets(); }, 1200);   // warm the bitmap after the first paint
-  let arcadeLive = 0;
-  function arcade(kind, anchor, onImpact) {
-    if (arcadeLive >= 3 || document.hidden) return;
-    const W = innerWidth, H = innerHeight, dpr = Math.min(2, devicePixelRatio || 1);
-    const cv = document.createElement("canvas"); cv.className = "arcade"; cv.width = W * dpr; cv.height = H * dpr;
-    document.body.appendChild(cv); arcadeLive++;
-    const g = cv.getContext("2d"); g.scale(dpr, dpr);
-    const spr = rocketSprite(kind), IMG = W < 600 ? 120 : 150, SZ = IMG * 0.32, RH = IMG * 0.8;   // IMG = drawn image size; the rocket is ~a third of it wide
-    const r = anchor ? anchor.getBoundingClientRect() : { left: W / 2 - 50, top: H / 2, width: 100, height: 40 };
-    const clampX = (x) => Math.min(W - 40, Math.max(40, x)), clampY = (y) => Math.min(H - 30, Math.max(30, y));
-    const ax = clampX(r.left + r.width * (kind === "tp" ? 0.5 : 0.82)), ay = clampY(r.top + r.height / 2);
-    const P = [], rings = [], rnd = (a, b) => a + Math.random() * (b - a), D = 2000;
-    let flash = null;
-    const add = (o) => P.push(Object.assign({ vx: 0, vy: 0, g: 0, drag: 1, life: 1, age: 0, s: 3, c: "#fff", glow: 0, grow: 0 }, o));
-    const burst = (x, y, n, sp, cols, life = 1.1, grav = 170) => { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), v = rnd(sp * 0.3, sp);
-      add({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: grav, drag: 0.962, life: rnd(life * 0.55, life), s: rnd(1.6, 3.4), c: cols[i % cols.length], glow: 10, trail: true }); } };
-    const puff = (x, y, n, col, sp = 90, big = 1) => { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), v = rnd(10, sp);
-      add({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - 10, drag: 0.94, life: rnd(0.6, 1.1), s: rnd(5, 10) * big, grow: 26 * big, c: col, smoke: true }); } };
-    // rocket state: a = angle (0 = nose up), fl = flame scale (0 = off)
-    const R = { x: ax, y: ay, a: 0, vx: 0, vy: 0, fl: 1, on: true, alpha: 1 };
-    if (kind === "buy") { R.y = clampY(ay + 6); R.vy = -70; }
-    if (kind === "tp") { R.y0 = Math.min(H - 20, r.top + r.height - 30); R.y = R.y0; R.yA = Math.max(70, r.top + 50); }
-    if (kind === "stop") { R.y0 = ay; }
-    if (kind === "sell") { R.y = -RH; R.land = clampY(r.top - 4) - RH * 0.3; }
-    const exhaust = () => ({ x: R.x - Math.sin(R.a) * IMG * 0.27, y: R.y + Math.cos(R.a) * IMG * 0.27 });
-    const TILT = -0.5, PX = 0.547, PY = 0.41;   // the photo points ~29 deg right of up; pivot = body centre in the image
-    function drawRocket() {
-      if (!spr || !R.on) return;
-      g.save(); g.globalAlpha = R.alpha; g.translate(R.x, R.y); g.rotate(R.a);
-      if (R.fl > 0.02) { const ny = IMG * 0.27, rr = SZ * 1.3 * R.fl * rnd(0.85, 1.15);   // engine glow flicker at the nozzle
-        const gl = g.createRadialGradient(0, ny, 0, 0, ny, rr); gl.addColorStop(0, `rgba(${RGLOW[kind]},.6)`); gl.addColorStop(1, `rgba(${RGLOW[kind]},0)`);
-        g.fillStyle = gl; g.beginPath(); g.arc(0, ny, rr, 0, Math.PI * 2); g.fill(); }
-      g.rotate(TILT); g.drawImage(spr.bmp, -IMG * PX, -IMG * PY, IMG, IMG);
-      g.restore();
-    }
-    const t0 = performance.now(); let last = t0;
-    const kill = () => { if (!cv.isConnected) return; cv.remove(); arcadeLive--; };
-    const hard = setTimeout(kill, D + 600);       // even if rAF is paused (tab hidden)
-    const frame = (now) => {
-      if (!cv.isConnected) return;
-      const t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000); last = now;
-      g.clearRect(0, 0, W, H);
-      // ---- choreography ----
-      if (kind === "buy" && R.on) { R.vy -= 1000 * dt; R.y += R.vy * dt; R.a = Math.sin(t * 11) * 0.035; R.fl = rnd(0.85, 1.15); if (R.y < -RH) R.on = false; }
-      if (kind === "tp" && R.on) { const k = Math.min(1, t / 0.6); R.y = R.y0 + (R.yA - R.y0) * k * k; R.a = Math.sin(t * 13) * 0.03; R.fl = rnd(0.9, 1.25);
-        if (k >= 1) { R.on = false; flash = { t, c: "25,230,193", a: 0.55, d: 0.6 };
-          burst(R.x, R.y, 130, 540, ["#19e6c1", "#00f5a0", "#7dffe3", "#ffffff", "#00c2ff"], 1.3);
-          for (let i = 0; i < 10; i++) { const a = rnd(0, Math.PI * 2), v = rnd(80, 260); add({ x: R.x, y: R.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: 0.95, g: 40, life: rnd(0.8, 1.2), s: rnd(5, 9), c: i % 2 ? "#ffffff" : "#7dffe3", glow: 12, star: true }); }
-          rings.push({ x: R.x, y: R.y, t0: t, c: "25,230,193", R: 180 }, { x: R.x, y: R.y, t0: t + 0.1, c: "0,245,160", R: 130 });
-          const bx = R.x, by = R.y;
-          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#00f5a0", "#19e6c1"], 0.9); rings.push({ x, y, t0: tt, c: "0,245,160", R: 70 }); }, 240);
-          setTimeout(() => { if (!cv.isConnected) return; const x = bx + rnd(-120, 120), y = by + rnd(-30, 90), tt = (performance.now() - t0) / 1000; burst(x, y, 55, 300, ["#19e6c1", "#ffffff"], 0.9); rings.push({ x, y, t0: tt, c: "25,230,193", R: 70 }); }, 430); } }
-      if (kind === "stop" && R.on) {
-        if (t < 0.5) { R.y = R.y0 - 46 * Math.sin((t / 0.5) * Math.PI / 2); R.a = Math.sin(t * 30) * 0.06 * (t / 0.5); R.fl = Math.random() < 0.3 ? 0 : rnd(0.2, 0.7); }   // stall: sputtering engine
-        else { if (!R.tumble) { R.tumble = 1; R.vy = -40; R.vx = R.x > W / 2 ? -70 : 70; R.spin = R.vx > 0 ? 7 : -7; R.fl = 0; puff(R.x, R.y + 10, 4, "90,90,100", 40); }
-          R.vy += 1050 * dt; R.y += R.vy * dt; R.x += R.vx * dt; R.a += R.spin * dt; R.fl = 0;
-          const ground = Math.min(H - 30, R.y0 + 300);
-          if (R.y > ground || t > 1.35) { R.on = false; flash = { t, c: "255,40,70", a: 0.4, d: 0.45 };
-            burst(R.x, R.y, 70, 380, ["#ff4d6d", "#ff8a3a", "#ffd0d0", "#ff2244"], 0.9, 260); puff(R.x, R.y, 12, "60,58,66", 120, 1.4);
-            rings.push({ x: R.x, y: R.y, t0: t, c: "255,77,109", R: 90 }); if (onImpact) onImpact(); } } }
-      if (kind === "sell" && R.on) { const k = Math.min(1, t / 1.05), e = 1 - Math.pow(1 - k, 3); R.y = -RH + (R.land + RH) * e; R.a = Math.sin(t * 7) * 0.03 * (1 - k);
-        R.fl = k < 1 ? rnd(0.55, 0.95) * (0.6 + 0.4 * (1 - e)) : Math.max(0, R.fl - dt * 6);
-        if (k >= 1 && !R.down) { R.down = t; const ex = exhaust(); puff(ex.x, ex.y, 12, "190,225,255", 110, 0.8); burst(ex.x, ex.y, 22, 170, ["#4da3ff", "#cfe6ff"], 0.6, 120); rings.push({ x: ex.x, y: ex.y, t0: t, c: "77,163,255", R: 60, flat: 1 }); }
-        if (R.down && t > 1.45) R.alpha = Math.max(0, 1 - (t - 1.45) / 0.4); }
-      // ---- exhaust particles ----
-      if (R.on && R.fl > 0.05) { const ex = exhaust(); const n = kind === "stop" ? 1 : 2;
-        for (let i = 0; i < n; i++) {
-          if (kind !== "sell" && (kind !== "tp" || i === 0)) add({ x: ex.x + rnd(-3, 3), y: ex.y + rnd(-2, 2), vx: rnd(-22, 22) - Math.sin(R.a) * 60, vy: rnd(30, 70) * Math.cos(R.a), drag: 0.95, life: rnd(0.45, kind === "tp" ? 0.6 : 0.85), s: rnd(3.5, 7), grow: 18, c: "190,198,214", smoke: true });
-          add({ x: ex.x, y: ex.y, vx: rnd(-70, 70), vy: rnd(60, 180) * (kind === "sell" ? 0.5 : 1), g: 220, life: rnd(0.2, kind === "sell" ? 0.3 : 0.5), s: rnd(1.1, 2.2), c: i ? RC2[kind] : RC[kind], glow: 8 }); } }
-      if (kind === "stop" && R.on && R.tumble) { add({ x: R.x + rnd(-4, 4), y: R.y + rnd(-4, 4), vx: rnd(-20, 20), vy: rnd(-30, 0), drag: 0.95, life: rnd(0.6, 1), s: rnd(5, 9), grow: 24, c: "55,52,60", smoke: true });
-        add({ x: R.x, y: R.y, vx: rnd(-150, 150), vy: rnd(-170, 30), g: 420, life: rnd(0.3, 0.6), s: rnd(1.3, 2.4), c: Math.random() < 0.5 ? "#ff4d6d" : "#ffb03a", glow: 8 }); }
-      if (R.on && (R.st = (R.st || 0) + dt) > 0.11) { R.st = 0; const a = rnd(0, Math.PI * 2), d = rnd(SZ * 0.8, SZ * 1.7);
-        add({ x: R.x + Math.cos(a) * d, y: R.y + Math.sin(a) * d * 1.2, vx: rnd(-8, 8), vy: kind === "buy" || kind === "tp" ? rnd(20, 50) : rnd(-10, 10), life: rnd(0.45, 0.75), s: rnd(3, 6), c: Math.random() < 0.6 ? "#ffffff" : { stop: "#ffb3c0", tp: "#7dffe3", buy: "#b9f6ca", sell: "#9fdcff" }[kind], glow: 8, star: true }); }
-      // ---- draw: smoke under, rocket, sparks/rings over ----
-      for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.age += dt; if (p.age > p.life) { P.splice(i, 1); continue; }
-        p.vx *= p.drag; p.vy = p.vy * p.drag + p.g * dt; p.ox = p.x; p.oy = p.y; p.x += p.vx * dt; p.y += p.vy * dt;
-        if (!p.smoke) continue; const k = 1 - p.age / p.life;
-        g.fillStyle = `rgba(${p.c},${0.3 * k})`; g.beginPath(); g.arc(p.x, p.y, p.s + p.grow * (1 - k), 0, Math.PI * 2); g.fill(); }
-      drawRocket();
-      for (const p of P) { if (p.smoke) continue; const k = 1 - p.age / p.life;
-        g.globalAlpha = k; g.shadowColor = p.c; g.shadowBlur = p.glow; g.strokeStyle = g.fillStyle = p.c;
-        if (p.star) { const z = p.s * Math.sin(Math.PI * (1 - k)), w = z * 0.28; g.globalAlpha = Math.min(1, 1.6 * Math.sin(Math.PI * (1 - k)));
-          g.beginPath(); g.moveTo(p.x, p.y - z); g.lineTo(p.x + w, p.y - w); g.lineTo(p.x + z, p.y); g.lineTo(p.x + w, p.y + w); g.lineTo(p.x, p.y + z); g.lineTo(p.x - w, p.y + w); g.lineTo(p.x - z, p.y); g.lineTo(p.x - w, p.y - w); g.closePath(); g.fill(); }
-        else if (p.trail) { g.lineWidth = p.s; g.lineCap = "round"; g.beginPath(); g.moveTo(p.ox - p.vx * 0.03, p.oy - p.vy * 0.03); g.lineTo(p.x, p.y); g.stroke(); }
-        else { g.beginPath(); g.arc(p.x, p.y, p.s, 0, Math.PI * 2); g.fill(); } }
-      g.globalAlpha = 1; g.shadowBlur = 0;
-      for (const rg of rings) { const k = (t - rg.t0) / 0.7; if (k < 0 || k > 1) continue; const rr = rg.R * (1 - Math.pow(1 - k, 3));
-        g.strokeStyle = `rgba(${rg.c},${1 - k})`; g.lineWidth = 6 * (1 - k) + 1; g.beginPath();
-        if (rg.flat) g.ellipse(rg.x, rg.y, rr, rr * 0.28, 0, 0, Math.PI * 2); else g.arc(rg.x, rg.y, rr, 0, Math.PI * 2); g.stroke(); }
-      if (flash && t - flash.t < flash.d) { const k = 1 - (t - flash.t) / flash.d, m = Math.max(W, H);   // soft edge glow, centre stays clear
-        const eg = g.createRadialGradient(W / 2, H / 2, m * 0.32, W / 2, H / 2, m * 0.75); eg.addColorStop(0, `rgba(${flash.c},0)`); eg.addColorStop(1, `rgba(${flash.c},${flash.a * k})`);
-        g.fillStyle = eg; g.fillRect(0, 0, W, H); }
-      if (t < D / 1000) requestAnimationFrame(frame); else { clearTimeout(hard); kill(); }
-    };
-    requestAnimationFrame(frame);
-  }
-
-
+  // ---------- Yobel effects (yobel.js): a gold shofar burst on a winning close, violet pulses on buy / exit, rose on a loss ----------
+  const warmFx = () => true;
+  function arcade(kind, anchor, onImpact) { if (window.Yobel) Yobel.burst(kind, anchor, onImpact); }
 
   function lastOrderLine(o) {
     const verb = o.side === "buy" ? "Bought" : "Sold";
@@ -651,10 +542,10 @@
       body = `<div class="big">${b.guarding ? "Guarding" : "Nothing open"}</div><div class="line"><span class="pill mono red">stop -${b.stop_pct ?? 25}%</span><span class="pill mono green">trail ${b.trail_pct ?? 40}%</span></div>
         <div class="line">${b.guarding ? b.guarding + " open position" + (b.guarding > 1 ? "s" : "") : "Watching for positions"}</div>`;
     }
-    return `<div class="card bot" ${full ? "" : `data-act="tab" data-tab="bots"`}><div class="head">${st}<span style="color:${esc(b.color || "#fff")}">${esc(b.title || b.name)}</span><span class="ter" style="margin-left:auto;font-weight:400;font-size:13px">${esc(b.status || "off")}</span></div>${body}</div>`;
+    return `<div class="card bot" ${full ? "" : `data-act="tab" data-tab="bots"`}><div class="head">${st}<span style="color:${esc(b.color || "#ffffff")}">${esc(b.title || b.name)}</span><span class="ter" style="margin-left:auto;font-weight:400;font-size:13px">${esc(b.status || "off")}</span></div>${body}</div>`;
   }
   function actRow(r) {
-    const k = r.kind, col = k === "bought" ? "#00f5a0" : k === "sold" ? (isTP(r) ? "#19e6c1" : "#00c2ff") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
+    const k = r.kind, col = k === "bought" ? "#f7cb6b" : k === "sold" ? (isTP(r) ? "#f7cc6e" : "#8657f4") : k === "stopped" ? "#ff4d6d" : "#8e8e93";
     const rv = k === "rejected" ? `<span class="mut">Skipped</span>` : esc(r.value || "");
     const act = k === "rejected" ? "audit" : "coin";
     return `<div class="row" data-act="${act}" data-mint="${esc(r.mint)}"><div class="ic" style="color:${col}">${esc((r.title || "?").split(" ").pop().slice(0, 1))}</div>
@@ -672,13 +563,13 @@
     if (!rows || !rows.length) return '<div class="t2" style="padding:6px 0">No skips</div>';
     const max = Math.max(...rows.map((r) => r.coins)) || 1;
     return rows.slice(0, n).map((r) => `<div class="row" style="min-height:40px;padding:6px 0"><div class="tx"><div class="t1" style="font-size:15px">${esc(r.label)}${r.rug ? ' <span class="tag">🛡️ rug safety</span>' : ""}</div>
-      <div style="height:6px;border-radius:3px;background:var(--c3,#333);margin-top:4px"><div style="height:6px;border-radius:3px;width:${Math.round((100 * r.coins) / max)}%;background:var(--accent,#7aa2ff)"></div></div></div><div class="rv">${r.coins}</div></div>`).join("");
+      <div style="height:6px;border-radius:3px;background:var(--c3,#333333);margin-top:4px"><div style="height:6px;border-radius:3px;width:${Math.round((100 * r.coins) / max)}%;background:var(--accent,#9f7af6)"></div></div></div><div class="rv">${r.coins}</div></div>`).join("");
   }
   function skipCard() {
     const s = S.files["skips"];
     if (s === undefined) return sk(120);
     if (!s) return "";
-    return `<div class="card" style="margin-bottom:12px" data-act="skips"><div class="grp" style="margin:0 0 4px">🔎 Skips · last hour ${s.mode === "starship" ? "· 🚀 Starship rules" : ""}</div>${skipCounts(s.last_hour, 4)}
+    return `<div class="card" style="margin-bottom:12px" data-act="skips"><div class="grp" style="margin:0 0 4px">🔎 Skips · last hour ${s.mode === "starship" ? "· ✦ Starship rules" : ""}</div>${skipCounts(s.last_hour, 4)}
       <div class="row" style="min-height:40px"><div class="tx"><div class="t2">Tonight: ${s.tonight.reduce((a, r) => a + r.coins, 0)} skips · ${s.recent.length} recent coins</div></div><span class="ter">›</span></div></div>`;
   }
   function viewSkips() {
@@ -686,14 +577,14 @@
     if (!s) return `<h1 class="title">Skips</h1>${s === undefined ? sk(200) : '<div class="empty"><b>No skip log yet</b>Every coin the bots look at but do not buy shows up here.</div>'}`;
     return `<h1 class="title">Skips</h1><div class="card" style="margin-bottom:12px"><div class="grp" style="margin:0 0 4px">Last hour</div>${skipCounts(s.last_hour, 8)}</div>
       <div class="card" style="margin-bottom:12px"><div class="grp" style="margin:0 0 4px">Tonight (since ${hm(s.night_start)})</div>${skipCounts(s.tonight, 12)}</div>
-      <div class="grp">Recent skipped coins</div>${s.recent.length ? `<div class="list">${s.recent.map((r) => `<div class="row" data-act="skip" data-mint="${esc(r.mint)}"><div class="tx"><div class="t1">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(r.bot)}${r.mode === "starship" ? " · 🚀" : ""}</span></div>
+      <div class="grp">Recent skipped coins</div>${s.recent.length ? `<div class="list">${s.recent.map((r) => `<div class="row" data-act="skip" data-mint="${esc(r.mint)}"><div class="tx"><div class="t1">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(r.bot)}${r.mode === "starship" ? " · ✦" : ""}</span></div>
         <div class="t2">${esc(r.reasons.map((x) => x.text).slice(0, 2).join(" · "))} · ${hm(r.ts)}</div></div><span class="ter">›</span></div>`).join("")}</div>` : '<div class="empty">No coins skipped in the last 24 h</div>'}
       <div class="t2" style="padding:12px 4px">Kept ${s.keep_days} days · 🛡️ = rug-safety filter (kept strict)</div>`;
   }
   function viewSkip(mint) {
     const s = S.files["skips"], r = s && s.recent.find((x) => x.mint === mint);
     if (!r) return `<h1 class="title">Skip</h1><div class="empty">Not in the recent skip log</div>`;
-    return `<h1 class="title">${sym(r.symbol, r.mint)}</h1><div class="card"><div class="grp" style="margin:0 0 4px">Skipped ${hm(r.ts)} by ${esc(r.bot)}${r.mode === "starship" ? " · 🚀 Starship rules" : ""}</div>
+    return `<h1 class="title">${sym(r.symbol, r.mint)}</h1><div class="card"><div class="grp" style="margin:0 0 4px">Skipped ${hm(r.ts)} by ${esc(r.bot)}${r.mode === "starship" ? " · ✦ Starship rules" : ""}</div>
       ${r.smart ? `<div class="row" style="min-height:40px"><div class="tx"><div class="t1" style="font-size:15px">🧠 Smart money</div><div class="t2">${r.smart} watchlist wallet${r.smart > 1 ? "s" : ""} bought this coin early</div></div></div>` : ""}
       ${r.reasons.map((x) => `<div class="row" style="min-height:44px"><div class="tx"><div class="t1" style="font-size:15px">✗ ${esc(x.label)}${x.rug ? ' <span class="tag">🛡️</span>' : ""}</div><div class="t2">${esc(x.text)}</div></div>
         <div class="rv">${x.value != null && x.threshold != null ? `${esc(fmtSkip(x.value, x.filter))} <span class="mut">${esc(x.op || "")} ${esc(fmtSkip(x.threshold, x.filter))}</span>` : ""}</div></div>`).join("")}</div>
@@ -726,8 +617,32 @@
   function skipActRow(r) {
     const x = r.reasons[0] || {}, more = r.reasons.length > 1 ? ` +${r.reasons.length - 1}` : "";
     return `<div class="row" style="min-height:44px" data-act="skip" data-mint="${esc(r.mint)}"><div class="ic" style="color:#8e8e93;opacity:.7">·</div>
-      <div class="tx"><div class="t1" style="font-size:15px">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(x.label || "")}${r.mode === "starship" ? " · 🚀" : ""}${r.smart ? " · 🧠 smart money" : ""}</span></div>
+      <div class="tx"><div class="t1" style="font-size:15px">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(x.label || "")}${r.mode === "starship" ? " · ✦" : ""}${r.smart ? " · 🧠 smart money" : ""}</span></div>
       <div class="t2">${esc(x.text || "")}${more} · ${hm(r.ts)}</div></div><div class="rv"><span class="mut">Skipped</span></div></div>`;
+  }
+  // Trades tab (MEM-24): closed trades only, from replay/index (pnl_usd = the corrected realized P&L). All: |P&L| desc; Wins: best first; Losses: worst first.
+  const trF = () => { const f = localStorage.getItem("desk.trf"); return f === "wins" || f === "losses" ? f : "all"; };
+  const trSigned = (v) => (v >= 0 ? "+" : "-") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const trWhen = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const trDur = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? h + "h " + m + "m" : m ? m + "m " + (s % 60) + "s" : s + "s"; };
+  function viewTrades() {
+    const a0 = S.files["activity/0"]; if (a0 && a0.rows && a0.rows[0]) localStorage.setItem("desk.seen", String(a0.rows[0].ts));
+    if (localStorage.getItem("desk.actlog") === "1") return `<button class="back" data-act="actlog">${ICON.back}Trades</button>` + viewActivity();
+    const ix = S.files["replay/index"];
+    if (ix === undefined) return `<h1 class="title">Trades</h1>${sk(60)}${sk(60)}${sk(60)}`;
+    const all = ((ix && ix.trades) || []).filter((t) => t.t_close && t.pnl_usd != null && isFinite(t.pnl_usd));
+    const f = trF(), wins = all.filter((t) => t.pnl_usd > 0), loss = all.filter((t) => t.pnl_usd < 0);
+    const list = f === "wins" ? wins.slice().sort((a, b) => b.pnl_usd - a.pnl_usd) : f === "losses" ? loss.slice().sort((a, b) => a.pnl_usd - b.pnl_usd) : all.slice().sort((a, b) => Math.abs(b.pnl_usd) - Math.abs(a.pnl_usd));
+    const net = all.reduce((x, t) => x + t.pnl_usd, 0), wr = all.length ? Math.round(100 * wins.length / all.length) : 0;
+    const chip = (k, l, n) => `<button class="trchip${f === k ? " on" : ""}" data-act="trf" data-f="${k}">${l} <i>${n}</i></button>`;
+    const row = (t) => { const up = t.pnl_usd >= 0, sy = t.symbol || String(t.mint || "").slice(0, 4);
+      return `<div class="row trrow" data-act="coin" data-mint="${esc(t.mint)}"><div class="ic" style="color:${up ? "#ff9752" : "#ff5c7a"}">${esc(sy.slice(0, 1))}</div>
+        <div class="tx"><div class="t1">${esc(sy)}${t.starship ? ` <span class="tag ss">${STAR}</span>` : ""}</div><div class="t2">${trWhen.format(new Date(t.t_close * 1000))} · held ${trDur(t.t_close - t.t_open)} · ${money(t.size, 0)} in</div><div class="t2 trwhy">${esc(t.reason || "closed")}</div></div>
+        <div class="rv"><b class="${up ? "up" : "down"}">${trSigned(t.pnl_usd)}</b><small class="${up ? "up" : "down"}">${t.pnl_pct != null ? (t.pnl_pct >= 0 ? "+" : "") + Math.round(t.pnl_pct) + "%" : ""}</small></div></div>`; };
+    const body = list.length ? `<div class="list">${list.map(row).join("")}</div>` : `<div class="empty"><b>${all.length ? "None here yet" : "No closed trades yet"}</b>${all.length ? (f === "wins" ? "No winning trades in the last 7 days." : "No losing trades in the last 7 days.") : "Trades appear here when a position is closed with a realized win or loss."}</div>`;
+    return `<h1 class="title">Trades</h1><div class="trsum"><span>${all.length} closed · ${wr}% won</span><b class="${net >= 0 ? "up" : "down"}">${all.length ? trSigned(net) : "–"}</b></div>
+      <div class="trchips">${chip("all", "All", all.length)}${chip("wins", "Wins", wins.length)}${chip("losses", "Losses", loss.length)}</div>${body}
+      <button class="loadmore trlog" data-act="actlog">Full activity log</button>`;
   }
   function viewActivity() {
     const pages = []; for (let i = 0; i < 10 && S.files["activity/" + i]; i++) pages.push(S.files["activity/" + i]);
@@ -792,12 +707,12 @@
       : `<div class="row"><div class="tx"><div class="t1">Trade alerts on this phone</div><div class="t2">${v.sub ? "On: buys, sells, take profits, stops" : "Off · buys, sells, take profits and stops only"}</div></div>
           <button class="sw ${v.sub ? "on" : ""}" data-act="vpush" aria-pressed="${!!v.sub}" aria-label="Trade alerts"><i></i></button></div>`;
     return `<h1 class="title">Account</h1>
-      <div class="vonly glass"><div class="t1">👀 VIEW ONLY</div><div class="t2">You're watching Pump Pilot with a read-only link: balance, charts, replay, positions, history and bot activity. No controls, no settings, nothing here can trade.</div></div>
+      <div class="vonly glass"><div class="t1">👀 VIEW ONLY</div><div class="t2">You're watching Yobel with a read-only link: balance, charts, replay, positions, history and bot activity. No controls, no settings, nothing here can trade.</div></div>
       <div class="grp">Desk</div><div class="list plain">
         <div class="row"><div class="tx"><div class="t1">Mode</div><div class="t2">${esc(st.mode || "–")}${st.mode === "LIVE" ? " · real money" : ""}</div></div></div>
         <div class="row"><div class="tx"><div class="t1">Cash</div><div class="t2">${money(st.cash)}</div></div></div></div>
       <div class="grp">Notifications</div><div class="list plain">${pushRow}</div><div class="ro p2msg" id="vmsg"></div>
-      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
+      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Yobel works</div><div class="t2">The bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
       <div class="ter" style="font-size:12px;text-align:center;margin:20px 0">Last update ${hm(S.lastIxT)} · view only</div>`;
   }
   async function vFetch(path, body) {
@@ -856,19 +771,22 @@
       ${canCtl() ? `<div class="grp">Control</div><div class="list plain">
         <button class="row" data-act="settingsv" style="width:100%;text-align:left"><div class="tx"><div class="t1">Settings</div><div class="t2">Stop, take profit, trail, sizes… same as /set, with confirm</div></div><span class="ter">›</span></button>
         <div class="row"><div class="tx"><div class="t1">👀 Viewer link</div><div class="t2">${viewerLine()}</div></div></div>
-        <button class="row ssrow" data-act="starship" style="width:100%;text-align:left"><span class="ssico">🚀</span><div class="tx"><div class="t1">Starship Mode</div><div class="t2">${ssAccountLine()}</div></div><span class="ter">›</span></button>
+        <button class="row ssrow" data-act="starship" style="width:100%;text-align:left"><span class="ssico">${STAR}</span><div class="tx"><div class="t1">Starship Mode</div><div class="t2">${ssAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window &amp; buy timer</div><div class="t2">${winAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="bots" style="width:100%;text-align:left"><div class="tx"><div class="t1">Pause / resume bots</div><div class="t2">${pausedNow().size ? "Paused: " + esc([...pausedNow()].join(", ")) : "All running"}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite · copy traders on/off · withdraw</div></div><span class="ter">›</span></button>
         <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
       </div>` : ""}
       ${S.tg ? `<div class="grp">Home Screen</div>${tgHomeRow()}` : ""}
-      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Pump Pilot works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
+      <div class="yoabout"><div class="yh"><img src="icons/icon-192.png" alt=""><div><b>Yobel</b><div class="yt">Jubilee · the year debts were cancelled</div></div></div>
+        <p>Yobel is Hebrew for Jubilee: the year debts were cancelled and people went free, announced with the blast of a ram's horn, the shofar. This desk is for the late-night, early-morning grinder making something out of nothing. When a trade closes in profit, the horn sounds.</p></div>
+      <div class="grp">Sound</div><div class="list plain"><button class="row" data-act="yosound" style="width:100%;text-align:left"><div class="tx"><div class="t1">Shofar on a win</div><div class="t2">A soft horn when a trade closes in profit · off by default</div></div><span class="switch ${window.Yobel && Yobel.soundOn() ? "on" : ""}"></span></button></div>
+      <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">How Yobel works</div><div class="t2">The operator's guide: bots, PAPER vs LIVE, stops, take profit</div></div><span class="ter">›</span></button></div>
       <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       ${copyPicks(ac.copy_picks)}
       <div class="grp">Notifications</div><div class="list plain">
         ${canCtl() ? `<button class="row" data-act="notif" style="width:100%;text-align:left"><div class="tx"><div class="t1">Notifications</div><div class="t2">Push to this phone · which events · quiet hours · Telegram alerts</div></div><span class="ter">›</span></button>`
-          : `<div class="row"><div class="tx"><div class="t1">Notifications</div><div class="t2">Open your Pump Pilot link with the control token to set up push</div></div></div>`}
+          : `<div class="row"><div class="tx"><div class="t1">Notifications</div><div class="t2">Open your Yobel link with the control token to set up push</div></div></div>`}
         <div class="row"><div class="tx"><div class="t1">Telegram</div><div class="t2">${ac.pushes && ac.pushes.telegram ? "connected" : "not connected"}</div></div></div>
         <div class="row"><div class="tx"><div class="t1">Watch in Grok Bot</div><div class="t2">Open the Grok Bot app to watch the bot's computer live</div></div></div>
       </div>
@@ -919,7 +837,7 @@
     else if (top && top.kind === "skip") { ensure("skips"); html = viewSkip(top.mint); }
     else if (S.tab === "home") { ensure("x_trends"); html = viewHome(); }
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); ensure("skips"); html = viewBots(); }
-    else if (S.tab === "activity") { ensure("skips"); html = viewActivity(); }
+    else if (S.tab === "activity") { ensure("skips"); ensure("replay/index"); html = S.files["replay/index"] === null ? viewActivity() : viewTrades(); }
     else if (S.tab === "account") { ensure("account"); ensure("settings"); html = viewAccount(); }
     const oldBal = $("#bal");     // keep the odometer node across renders so changed digits roll
     view.innerHTML = html;
@@ -960,6 +878,8 @@
     else if (act === "range") { S.range = t.dataset.r; await getFile("chart/" + S.range).catch(() => {}); render(); }
     else if (act === "coin" && t.dataset.mint) push({ kind: "coin", mint: t.dataset.mint });
     else if (act === "skips") push({ kind: "skips" });
+    else if (act === "trf") { localStorage.setItem("desk.trf", t.dataset.f); render(); }
+    else if (act === "actlog") { localStorage.setItem("desk.actlog", localStorage.getItem("desk.actlog") === "1" ? "0" : "1"); render(); scrollTo(0, 0); }
     else if (act === "actf") { localStorage.setItem("desk.actf", t.dataset.f); render(); }
     else if (act === "skopen") { localStorage.setItem("desk.skopen", localStorage.getItem("desk.skopen") === "1" ? "0" : "1"); render(); }
     else if (act === "skip" && t.dataset.mint) push({ kind: "skip", mint: t.dataset.mint });
@@ -1002,6 +922,7 @@
     else if (act === "invite") invite();
     else if (act === "closesheet") closeSheet();
     else if (act === "fxdemo") fxDemo();
+    else if (act === "yosound") { if (window.Yobel) { Yobel.setSound(!Yobel.soundOn()); render(true); } }
     else if (act === "mode") openMode(t.dataset.m);
     else if (act === "replay") Replay.open();
     else if (act === "rptrade") Replay.open({ mint: t.dataset.mint });
@@ -1057,7 +978,7 @@
       down: ["bad", "Desk unreachable", "No answer from the desk. Check the connection and try again"],
       badtoken: ["bad", "Desk refused this device", "The control token on this phone is wrong or old. Open the new link"],
       locked: ["bad", "Desk unreachable", "Too many tries: the desk is ignoring this device for a few minutes"],
-      notoken: ["mut", "No control token on this device", "Open your Pump Pilot link with the control token to switch mode from here"],
+      notoken: ["mut", "No control token on this device", "Open your Yobel link with the control token to switch mode from here"],
       idle: ["mut", "Checking the desk…", ""] }[c.st] || ["mut", "Checking the desk…", ""];
     let extra = "";
     if (s && c.st === "ok") {
@@ -1292,7 +1213,7 @@
     setMsg(apiText(r.j), ""); confirmStep(p.pid, `Confirm: ${p.new} Rome time`, "red", (j, ok) => { if (ok) winDone(j); });
   }
 
-  // ---- 🚀 STARSHIP MODE (2026-11-15). Same Telegram handler: /starship on | off | for 2h. Ships OFF; only Dustin turns it
+  // ---- ✦ STARSHIP MODE (2026-11-15). Same Telegram handler: /starship on | off | for 2h. Ships OFF; only Dustin turns it
   // on, through the confirm sheet (LIVE = a real-money warning). Settings edit through the normal /set confirm (openSet).
   async function loadStarship() {
     const r = await api("/api/starship"); S.ssErr = r.status === 200 ? null : apiErr(r);
@@ -1314,23 +1235,23 @@
   function ssHomeCard() {
     const x = ssState();
     if (!x) { if (!S.ssAsked && ctlAuth()) { S.ssAsked = true; ctlPoll().then(() => { if (S.tab === "home") render(true); }); } return ""; }
-    if (!x.enabled) return `<button class="sshome off" data-act="starship"><span class="ssico">🚀</span><div class="tx"><div class="t1">Starship Mode <span class="sspill">OFF</span></div><div class="t2">Riskier sniper mode · tap to see it</div></div><span class="ter">›</span></button>`;
-    return `<button class="sshome on" data-act="starship"><span class="ssico lift">🚀</span><div class="tx"><div class="t1">Starship Mode <span class="sspill on">ON</span></div><div class="t2">${x.until_ts ? `Lands in <b data-sscd="${x.until_ts}">${fmtLeft(x.until_ts - ssNow())}</b> · ${romeHM(x.until_ts)} Rome` : "No timer · until you land it"}${curMode() === "LIVE" ? " · LIVE real money" : ""}</div></div><span class="ter">›</span></button>`;
+    if (!x.enabled) return `<button class="sshome off" data-act="starship"><span class="ssico">${STAR}</span><div class="tx"><div class="t1">Starship Mode <span class="sspill">OFF</span></div><div class="t2">Riskier sniper mode · tap to see it</div></div><span class="ter">›</span></button>`;
+    return `<button class="sshome on" data-act="starship"><span class="ssico lift">${STAR}</span><div class="tx"><div class="t1">Starship Mode <span class="sspill on">ON</span></div><div class="t2">${x.until_ts ? `Lands in <b data-sscd="${x.until_ts}">${fmtLeft(x.until_ts - ssNow())}</b> · ${romeHM(x.until_ts)} Rome` : "No timer · until you land it"}${curMode() === "LIVE" ? " · LIVE real money" : ""}</div></div><span class="ter">›</span></button>`;
   }
   function ssPnl(st) {
     const wr = (a) => a.win_rate == null ? "–" : Math.round(a.win_rate) + "%", cell = (a) => `<b class="${a.net_usd > 0 ? "up" : a.net_usd < 0 ? "down" : ""}">${signedMoney(a.net_usd)}</b>`;
     const row = (lab, a, b) => `<tr><th>${lab}</th><td>${a}</td><td>${b}</td></tr>`, s = st.starship, n = st.normal;
-    return `<div class="sspnl glass"><table><thead><tr><th></th><th>🚀 Starship</th><th>Normal</th></tr></thead><tbody>
+    return `<div class="sspnl glass"><table><thead><tr><th></th><th>✦ Starship</th><th>Normal</th></tr></thead><tbody>
       ${row("Trades today", s.today.trades, n.today.trades)}${row("Win rate today", wr(s.today), wr(n.today))}${row("Net P&amp;L today", cell(s.today), cell(n.today))}
       ${row("Trades all-time", s.all.trades, n.all.trades)}${row("Win rate all-time", wr(s.all), wr(n.all))}${row("Net P&amp;L all-time", cell(s.all), cell(n.all))}
       </tbody></table><div class="t2">${st.open} Starship position${st.open === 1 ? "" : "s"} open · ${esc(st.mode)} · today = Rome calendar day · win rate on closed trades</div></div>`;
   }
   function viewStarship() {
-    const x = S.ss, head = backBar("Account") + `<h1 class="title">🚀 Starship Mode</h1>`;
+    const x = S.ss, head = backBar("Account") + `<h1 class="title">✦ Starship Mode</h1>`;
     if (!x) return head + (S.ssErr ? `<div class="empty"><b>Can't reach the desk</b>${esc(S.ssErr)}</div>` : sk(150) + sk(120) + sk(200));
     const p = x.params, nm = x.normal, live = curMode() === "LIVE";
     const hero = `<div class="sshero ${x.enabled ? "on" : ""}">
-        <div class="ssstars"></div><div class="ssrocket ${x.enabled ? "lift" : ""}">🚀</div>
+        <div class="ssstars"></div><div class="ssmark ${x.enabled ? "lift" : ""}">${STAR}</div>
         <div class="sshead"><div class="t1">${x.enabled ? "Starship is flying" : "Starship is on the pad"}</div>
           <div class="t2">${x.enabled ? (x.until_ts ? `Lands at ${romeHM(x.until_ts)} Rome time` : "No timer: until you land it or the daily loss cap") : "OFF · the desk trades normally"}</div></div>
         <button class="sw ${x.enabled ? "on" : ""} live" data-act="sstoggle" aria-pressed="${!!x.enabled}" aria-label="Starship Mode"><i></i></button>
@@ -1365,7 +1286,7 @@
   async function ssCap() {
     const v = +(($("#sscap") || {}).value || "").replace(",", ".");
     if (!(v >= 1 && v <= 500)) return toast("Daily loss cap: $1 to $500");
-    sheet(`<div class="p2t">🚀 Daily Starship loss cap → $${esc(v)}</div><div class="ro">Starship turns itself off at this realized loss per Rome day.</div>
+    sheet(`<div class="p2t">✦ Daily Starship loss cap → $${esc(v)}</div><div class="ro">Starship turns itself off at this realized loss per Rome day.</div>
       <div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div><button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
     const r = await api("/api/set", { key: "starship.day_loss_usd", value: v }); const p = r.status === 200 && r.j.proposal;
     if (!p) { const g = $("#p2go"); if (g) g.textContent = "Not changed"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
@@ -1374,7 +1295,7 @@
   function ssToggle() { const x = S.ss || ssState(); if (!x) return; if (x.enabled) return ssAsk(false, null); ssLaunch(null); }
   function ssLaunch(h) {
     if (h === "c") {
-      sheet(`<div class="p2t">🚀 Starship for…</div><div class="ro">Hours, 0.25 to 24 (e.g. 1.5).</div>
+      sheet(`<div class="p2t">✦ Starship for…</div><div class="ro">Hours, 0.25 to 24 (e.g. 1.5).</div>
         <input id="p2val" class="livein p2in" type="text" inputmode="decimal" placeholder="1.5" autocomplete="off" spellcheck="false">
         <div class="ro p2msg" id="p2msg"></div><button class="btn primary" id="p2go" style="width:100%;margin-top:12px">Review</button>`);
       $("#p2go").onclick = () => { const v = +($("#p2val").value || "").replace(",", "."); if (v >= 0.25 && v <= 24) return ssAsk(true, v); setMsg("Type hours from 0.25 to 24", "err"); };
@@ -1385,7 +1306,7 @@
   async function ssAsk(on, hours) {
     if (!canCtl()) return toast("No control token on this device");
     const live = curMode() === "LIVE";
-    sheet(`<div class="p2t">${on ? "🚀 Launch Starship Mode" + (hours ? ` for ${hours}h` : "") + "?" : "Land Starship Mode (OFF)?"}</div>
+    sheet(`<div class="p2t">${on ? "✦ Launch Starship Mode" + (hours ? ` for ${hours}h` : "") + "?" : "Land Starship Mode (OFF)?"}</div>
       ${on && live ? `<div class="p2note live sswarn"><b>⚠️ LIVE · REAL MONEY.</b> Starship buys earlier, riskier coins, more often, with a tight stop: expect more small losses. Half size by default, max ${esc((S.ss && S.ss.params.max_open) || 2)} open, auto-off at the daily loss cap.</div>` : ""}
       <div class="mrows" id="p2rows">${sk(36)}</div><div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div>
       <button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
@@ -1569,7 +1490,7 @@
   function openGuide() {
     if ($("#guidev")) return;
     const d = document.createElement("div"); d.id = "guidev"; d.className = "guidev";
-    d.innerHTML = `<div class="gbar"><button data-gclose>✕ Close</button><b>How Pump Pilot works</b><a href="guide.html" target="_blank" rel="noopener">Open ↗</a></div><iframe src="guide.html" title="Pump Pilot guide"></iframe>`;
+    d.innerHTML = `<div class="gbar"><button data-gclose>✕ Close</button><b>How Yobel works</b><a href="guide.html" target="_blank" rel="noopener">Open ↗</a></div><iframe src="guide.html" title="Yobel guide"></iframe>`;
     d.querySelector("[data-gclose]").onclick = () => { d.remove(); if (history.state && history.state.guide) history.back(); };
     document.body.appendChild(d); history.pushState({ d: S.stack.length, guide: 1 }, "");
   }
@@ -1583,7 +1504,7 @@
     const h = location.hash.slice(1).split("&").filter((x) => x && x !== "fx=demo").join("&");
     history.replaceState(history.state, "", location.pathname + location.search + (h ? "#" + h : ""));
   }
-  const DEMO = { buy: ["Buy", "green rocket launch"], tp: ["Take profit", "firework"], stop: ["Stop loss", "crash"], sell: ["Exit", "blue rocket landing"] };
+  const DEMO = { buy: ["Buy", "violet pulse"], tp: ["Win", "gold shofar burst"], stop: ["Stop loss", "rose pulse + shake"], sell: ["Exit", "violet ring"] };
   const demoRow = () => `<div class="prow gain demo" id="demorow"><div class="pic">★</div>
       <div class="ptx"><div class="psym">SAMPLE <span class="tag demo">PREVIEW</span></div><div class="psub">Not a real position · no trade</div></div>
       <div class="ppl"><div class="pval">$0.00</div><div class="pchg mut">effects demo</div></div></div>`;
@@ -1592,7 +1513,7 @@
     if (!S.state) { toast("Open your desk link first, then replay"); return; }
     S.demo = true; go("home");
     const calm = reduce();
-    if (!calm) { for (let i = 0; i < 20 && !warmRockets(); i++) await new Promise((r) => setTimeout(r, 100)); }
+    if (!calm) { for (let i = 0; i < 20 && !warmFx(); i++) await new Promise((r) => setTimeout(r, 100)); }
     const row0 = $("#demorow"); if (row0) row0.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" });
     ["buy", "tp", "stop", "sell"].forEach((k, i) => setTimeout(() => {
       if (S.tab !== "home" || S.stack.length) return;            // left Home: skip the rest quietly
@@ -1622,7 +1543,7 @@
     lockout: ["Wrong-token lockout", "Someone tried bad control tokens"], alert: ["Other desk alerts", "FOMO code screen, Chrome, safety box"], control: ["Your app actions", "Mode, buy/sell sent, settings, pause"],
     maintenance: ["Maintenance / updates", "Update starting, and updated ✓ when it's back"], timer: ["Buy timer", "Timer started, cancelled, and when it ends"],
     window: ["Trading window", "Window turned on / off, hours changed"],
-    starship: ["🚀 Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["🚀 Starship trades", "Each Starship buy, take profit and exit"],
+    starship: ["✦ Starship Mode", "On / off, timer end, loss-cap auto-off"], starship_trade: ["✦ Starship trades", "Each Starship buy, take profit and exit"],
     viewer: ["👀 Viewer link", "Created, revoked, first opened"],
     skips: ["🔎 Skip summary", "Top skip reasons, every 3 h (only if coins were skipped)"],
     health: ["🩺 Morning health check", "09:35, only if something is wrong (not LIVE, bot paused, no coins to Brain, memory)"] };
@@ -1651,10 +1572,10 @@
   const tgHomeRow = () => S.tg ? `<div class="list plain" id="tghome"><div class="row"><div class="tx"><div class="t1">Get the real app: send /install</div><div class="t2">In this chat send /install, then press and hold the link → Open in Safari → Share → Add to Home Screen. That app gets iPhone notifications.</div></div></div></div>` : "";
   function envNote(env) {
     const N = {
-      telegram: ["Telegram's in-app browser can't show notifications", "Open Pump Pilot from its icon on your Home Screen, then Account → Notifications → Enable. No icon yet? Send /install in the Telegram chat. Your settings below still work from here."],
-      iostab: ["Notifications need the home-screen app", "On iPhone, Safari tabs can't get push. In Safari tap Share → Add to Home Screen, then open Pump Pilot from that icon and come back here. (Already added? Open it from the icon, not from Safari.)"],
+      telegram: ["Telegram's in-app browser can't show notifications", "Open Yobel from its icon on your Home Screen, then Account → Notifications → Enable. No icon yet? Send /install in the Telegram chat. Your settings below still work from here."],
+      iostab: ["Notifications need the home-screen app", "On iPhone, Safari tabs can't get push. In Safari tap Share → Add to Home Screen, then open Yobel from that icon and come back here. (Already added? Open it from the icon, not from Safari.)"],
       unsupported: ["This browser can't do web push", "On iPhone you need iOS 16.4 or newer and the home-screen app. Telegram alerts keep working meanwhile."],
-      denied: ["Notifications are blocked for Pump Pilot", "iPhone: Settings → Notifications → Pump Pilot → Allow Notifications, then come back and tap Enable."] }[env];
+      denied: ["Notifications are blocked for Yobel", "iPhone: Settings → Notifications → Yobel → Allow Notifications, then come back and tap Enable."] }[env];
     return N ? `<div class="p2note warn"><b>${esc(N[0])}</b><br>${esc(N[1])}</div>` : "";
   }
   function viewNotif() {
@@ -1689,13 +1610,13 @@
     // the permission prompt first, straight from the tap (iOS refuses it later in the promise chain)
     let perm;
     try { perm = PF() ? await PF().requestPermission() : await Notification.requestPermission(); } catch { perm = "default"; }
-    if (perm !== "granted") { render(true); return nfMsg(perm === "denied" ? "Blocked. iPhone: Settings → Notifications → Pump Pilot → Allow." : "Not allowed. Tap Enable again and choose Allow."); }
+    if (perm !== "granted") { render(true); return nfMsg(perm === "denied" ? "Blocked. iPhone: Settings → Notifications → Yobel → Allow." : "Not allowed. Tap Enable again and choose Allow."); }
     nfMsg("Turning on push…");
     let sub;
     try {
       const reg = await swReg();
       sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(S.nf.key) }));
-    } catch (e) { if (btn) btn.disabled = false; return nfMsg("This phone couldn't turn push on (" + esc(e.name || "error") + "). Close Pump Pilot fully, reopen it from the icon and try again."); }
+    } catch (e) { if (btn) btn.disabled = false; return nfMsg("This phone couldn't turn push on (" + esc(e.name || "error") + "). Close Yobel fully, reopen it from the icon and try again."); }
     const r = await api("/api/push/subscribe", { subscription: sub.toJSON ? sub.toJSON() : sub });
     if (r.status !== 200) { if (btn) btn.disabled = false; return nfMsg(apiErr(r)); }
     S.nf.sub = true; S.nf.devices = r.j.devices; haptic("success"); render(true); nfMsg("Push is on. Tap Send test to check.");
@@ -1730,7 +1651,7 @@
   function tgSwitch() {
     const on = !!(S.nf && S.nf.prefs && S.nf.prefs.telegram);
     if (!on) return prefSwitch({ telegram: true }, "Telegram alerts on");
-    const sh = sheet(`<div class="p2t">Turn Telegram alerts off?</div><div class="ro">Telegram stops getting desk messages (fills, alerts, reports). This app's notifications become the only channel, so check Send test works first. Telegram commands and the Pump Pilot button keep working. Telegram gets one last message saying it's off.</div>
+    const sh = sheet(`<div class="p2t">Turn Telegram alerts off?</div><div class="ro">Telegram stops getting desk messages (fills, alerts, reports). This app's notifications become the only channel, so check Send test works first. Telegram commands and the Yobel button keep working. Telegram gets one last message saying it's off.</div>
       <div class="btns" style="margin-top:12px"><button class="btn primary" id="tgoff">Turn off</button></div>`);
     $("#tgoff").onclick = () => { closeSheet(); prefSwitch({ telegram: false }, "Telegram alerts off"); };
     return sh;
@@ -1765,7 +1686,7 @@
     if (!inTelegram()) return;
     const w = await loadTelegram(); if (!w || !w.initData) return;
     S.tg = w; document.documentElement.classList.add("tg");
-    try { w.ready(); w.expand(); w.setHeaderColor("#07090f"); w.setBackgroundColor("#04090b"); if (w.setBottomBarColor) w.setBottomBarColor("#04090b"); } catch {}
+    try { w.ready(); w.expand(); w.setHeaderColor("#060714"); w.setBackgroundColor("#04050f"); if (w.setBottomBarColor) w.setBottomBarColor("#04050f"); } catch {}
     const tp = w.themeParams || {}; if (tp.link_color) document.documentElement.style.setProperty("--tg-link", tp.link_color);   // light touch: links only, our dark-teal stays
     try { w.BackButton.onClick(() => history.back()); } catch {}
     if (!DeskCrypto.dataPath()) {      // the webview has no #d= link: the desk hands the data key to a validated initData session (memory only)
@@ -1812,5 +1733,6 @@
   }
   addEventListener("resize", () => after());
   lvStart();
+  if (window.Yobel) Yobel.init({ refresh: () => poll(), go: (t) => go(t), tab: () => S.tab, tabs: TABS, canSwipe: () => !S.stack.length && !document.querySelector("#rpv") });
   start();
 })();

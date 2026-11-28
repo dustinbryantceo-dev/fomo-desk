@@ -1,4 +1,4 @@
-// replay.js - Pump Pilot Replay (MEM-22). A full-screen player for one trade or one time window.
+// replay.js - Yobel Replay (MEM-22). A full-screen player for one trade or one time window.
 // Data = what the desk already publishes (encrypted payload): replay/index + replay/<id> (db.prices line, bot steps), chart/1D|1W (balance), nothing else.
 // Local only: no writes, nothing sent to the desk, no network calls of its own. All times are shown in CET/CEST (Europe/Berlin).
 const Replay = (() => {
@@ -20,10 +20,10 @@ const Replay = (() => {
   const clock = (ts) => fT.format(new Date(ts * 1000)), hhmm = (ts) => fH.format(new Date(ts * 1000));
   const stamp = (ts) => fD.format(new Date(ts * 1000)) + " " + hhmm(ts);
   const dur = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`; };
-  const BOT = { scanner: "#64d2ff", analyst: "#bf5af2", brain: "#ffa62b", executor: "#00f5a0", risk: "#ff4d6d", desk: "#8e8e93" };
+  const BOT = { scanner: "#9b73f6", analyst: "#bf5af2", brain: "#ff802b", executor: "#f7cb6b", risk: "#ff4d6d", desk: "#8e8e93" };
   const botColor = (n) => { const b = ((B.S.state && B.S.state.bots) || []).find((x) => x.name === n); return (b && b.color) || BOT[n] || "#8e8e93"; };
   const botName = (n) => ({ scanner: "Scanner", analyst: "Analyst", brain: "Brain", executor: "Executor", risk: "Risk", desk: "Desk" }[n] || n);
-  const KC = { buy: "#00e676", tp: "#19e6c1", trail: "#64d2ff", stop: "#ff4d6d", manual: "#2f7bff", exit: "#2f7bff", moonbag_on: "#b18cff", breakeven: "#ffd60a" };
+  const KC = { buy: "#f7c967", tp: "#f7cc6e", trail: "#9b73f6", stop: "#ff4d6d", manual: "#9064f5", exit: "#9064f5", moonbag_on: "#a37ff7", breakeven: "#ffd60a" };
   const KL = { buy: "BUY", tp: "TP", trail: "TRAIL", stop: "STOP", manual: "EXIT", exit: "EXIT", moonbag_on: "MOON", breakeven: "BE" };
   const SRC = { migration: "migration feed", near_grad: "near-graduation feed", x_trend: "X trend", jup_recent: "Jupiter feed", launchlab: "LaunchLab", smart_money: "smart-money wallets", helius_pool: "new-pool stream" };
   const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -113,7 +113,7 @@ const Replay = (() => {
         <div class="wn">${w.n ? `${w.n} trade${w.n > 1 ? "s" : ""} · ${w.done ? `<b class="${w.net >= 0 ? "up" : "down"}">${signed(w.net)}</b> · ${w.wins}/${w.done} won` : "in progress"}` : "no trades"}</div><span class="wgo">▶</span></button>`).join("")}</div>
       <h3 class="rph">Replay a trade</h3>
       <div class="rptl glass">${trades.map((t) => { const open = !t.t_close, up = (t.pnl_usd || 0) >= 0;
-        return `<button class="rptr" data-rp="trade" data-id="${t.id}"><div class="ic">${esc((t.symbol || "?").slice(0, 1))}</div><div class="tx"><div class="t1">${esc(t.symbol || t.mint.slice(0, 4))}${t.starship ? ' <span class="tag ss">🚀</span>' : ""}${open ? ' <span class="tag live">OPEN</span>' : ""}</div>
+        return `<button class="rptr" data-rp="trade" data-id="${t.id}"><div class="ic">${esc((t.symbol || "?").slice(0, 1))}</div><div class="tx"><div class="t1">${esc(t.symbol || t.mint.slice(0, 4))}${t.starship ? ' <span class="tag ss">✦</span>' : ""}${open ? ' <span class="tag live">OPEN</span>' : ""}</div>
           <div class="t2">${stamp(t.t_open)} ${zone(t.t_open)} · ${open ? "holding" : dur(t.t_close - t.t_open)} · ${money(t.size, 0)} in${t.reason ? " · " + esc(t.reason) : ""}</div></div>
           <div class="rv">${open ? "" : `<b class="${up ? "up" : "down"}">${signed(t.pnl_usd)}</b><small class="${up ? "up" : "down"}">${pct(t.pnl_pct, 0)}</small>`}</div><span class="wgo">▶</span></button>`; }).join("")}</div></div>`;
   }
@@ -126,8 +126,8 @@ const Replay = (() => {
     if (!D) { root.innerHTML = bar("Replay", "", "back") + `<div class="rpscroll"><div class="rpempty2"><b>This trade isn't published</b>It is too old or the desk hasn't published it yet.</div></div>`; return; }
     prep(D); R.D = D; R.sumOn = false; R.t0 = D.w0; R.t1 = D.w1; R.pos = D.w0;
     R.marks = D._marks.map((m) => m.ts); R.stepTs = D._steps.map((s) => s.ts);
-    const span = R.t1 - R.t0; R.speeds = [1, 4, 16, 60]; R.speed = R.speeds.find((s) => span / s <= 60) || 60;
-    const ttl = `${esc(D.symbol || D.mint.slice(0, 4))}${D.starship ? " 🚀" : ""}`;
+    const span = R.t1 - R.t0; R.v0 = Math.max(1, span / 30); R.ev = tradeEvents(D);
+    const ttl = `${esc(D.symbol || D.mint.slice(0, 4))}${D.starship ? " ✦" : ""}`;
     root.innerHTML = bar(D.symbol || "Trade", `${stamp(D.t_open)} ${zone(D.t_open)}${D.t_close ? "" : " · open"}`, "back") + `<div class="rpscroll" id="rpscroll">
       <div class="rpstick">
         <div class="rpread"><div class="rr1"><div class="rpx1" id="rPrice">–</div><div class="rpx2"><span id="rMcap">–</span><span class="mut"> market cap</span></div></div>
@@ -135,8 +135,8 @@ const Replay = (() => {
         ${chartHtml()}${controlsHtml()}
       </div>
       <div id="rpsum"></div>
-      <h3 class="rph rps">What the bots did <small>tap a step to jump there</small></h3>
-      <div class="rpsteps" id="rpsteps">${D._steps.map((s, i) => stepHtml(D, s, i)).join("")}</div>
+      <button class="rpmore" id="rpMore" data-rp="steps">What the bots did · ${D._steps.length} steps <span>▾</span></button>
+      <div class="rpsteps" id="rpsteps" hidden>${D._steps.map((s, i) => stepHtml(D, s, i)).join("")}</div>
       <div class="rppad"></div></div>`;
     wire(); R.lastStep = -2; play(true);
   }
@@ -149,7 +149,7 @@ const Replay = (() => {
     if (pts.length < 2) { root.innerHTML = bar(w.title, "", "back") + `<div class="rpscroll"><div class="rpempty2"><b>No balance history here yet</b>The balance line for this window isn't published yet.</div></div>`; return; }
     const start = pts[0][1]; R.pts = pts; R.sumOn = false; R.start = start; R.t0 = Math.max(w.t0, pts[0][0]); R.t1 = pts[pts.length - 1][0]; R.pos = R.t0;
     R.marks = trades.flatMap((t) => [t.t_open, t.t_close].filter(Boolean)).sort((a, b) => a - b); R.stepTs = trades.map((t) => t.t_open);
-    R.speeds = [60, 240, 900, 3600]; R.speed = R.speeds.find((s) => (R.t1 - R.t0) / s <= 50) || 3600;
+    R.v0 = Math.max(1, (R.t1 - R.t0) / 30); R.ev = windowEvents(trades);
     root.innerHTML = bar(w.title, `${stamp(R.t0)} → ${hhmm(R.t1)} ${zone(R.t1)}`, "back") + `<div class="rpscroll" id="rpscroll">
       <div class="rpstick">
         <div class="rpread"><div class="rr1"><div class="rpx1" id="rPrice">–</div><div class="rpx2"><span class="mut">balance</span></div></div>
@@ -157,15 +157,14 @@ const Replay = (() => {
         ${chartHtml()}${controlsHtml()}
       </div>
       <div id="rpsum"></div>
-      <h3 class="rph rps">Trades in this window <small>tap one to replay it</small></h3>
-      <div class="rpsteps" id="rpsteps">${trades.map((t, i) => winCardHtml(t, i)).join("")}</div><div class="rppad"></div></div>`;
+      <button class="rpmore" id="rpMore" data-rp="steps">Trades in this window · ${trades.length} <span>▾</span></button>
+      <div class="rpsteps" id="rpsteps" hidden>${trades.map((t, i) => winCardHtml(t, i)).join("")}</div><div class="rppad"></div></div>`;
     wire(); R.lastStep = -2; play(true);
   }
   const chartHtml = () => `<div class="rpchart"><canvas id="rpc" aria-label="Price chart"></canvas></div>
     <div class="rpscrub"><input id="rpr" type="range" min="0" max="1000" value="0" aria-label="Timeline"><div class="rpticks" id="rpticks"></div></div>
     <div class="rptimes"><span id="rT0"></span><b id="rNow"></b><span id="rT1"></span></div>`;
-  const controlsHtml = () => `<div class="rpctl2"><button class="cb" data-rp="prev" aria-label="Previous step">⏮</button><button class="cb big" data-rp="toggle" id="rpPlay" aria-label="Play or pause">▶</button><button class="cb" data-rp="next" aria-label="Next step">⏭</button>
-    <div class="spd2" role="group" aria-label="Speed">${R.speeds.map((x) => `<button data-rp="speed" data-s="${x}" class="${x === R.speed ? "on" : ""}">${x}x</button>`).join("")}</div></div>`;
+  const controlsHtml = () => `<div class="rpctl3"><button class="cb big" data-rp="toggle" id="rpPlay" aria-label="Play or pause">▶</button><div class="rplab" id="rpLab" data-rp="steps" role="button" aria-live="polite"></div></div>`;
 
   function wire() {
     const r = $("#rpr"), c = $("#rpc"), sc = $("#rpscroll"); R.sc = sc;
@@ -191,13 +190,43 @@ const Replay = (() => {
       R.raf = 0; if (!R || !root) return;
       if (R.playing) {
         const dt = R.last ? Math.min(0.1, (now - R.last) / 1000) : 0; R.last = now;
-        R.pos = Math.min(R.t1, R.pos + dt * R.speed);
+        R.pos = Math.min(R.t1, R.pos + dt * R.v0 * speedAt(R.pos).f);
         if (R.pos >= R.t1) { R.playing = false; syncPlay(); }
       }
       frame(false);
       if (R.playing) R.raf = requestAnimationFrame(step);
     };
     R.raf = requestAnimationFrame(step);
+  }
+  // ---------- events + auto slow motion: ease into ~0.1x before every buy / sell / TP / stop / moonbag, hold on the marker, ease back ----------
+  const sgn0 = (v) => (v == null || isNaN(v) ? "" : (v >= 0 ? "+" : "-") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: Math.abs(v) >= 100 ? 0 : 2, maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2 }));
+  function tradeEvents(D) {
+    const ev = [];
+    D._steps.forEach((s, si) => {
+      const base = KL[s.kind] || (s.kind === "moonbag" ? "MOONBAG" : null); if (!base || s.kind === "breakeven") return;
+      const label = s.kind === "buy" ? `BUY ${money(D.size, 0)} @ ${D.supply ? compact(D.entry * D.supply) + " mcap" : priceFmt(D.entry)}` : s.kind === "moonbag_on" ? "MOONBAG ON" : `${base} ${sgn0(s.pnl_usd)}`.trim();
+      ev.push({ ts: s.ts, kind: s.kind === "moonbag" ? "moonbag_on" : s.kind, label, si });
+    });
+    return ev.sort((a, b) => a.ts - b.ts);
+  }
+  function windowEvents(ts) {
+    const ev = []; ts.forEach((t, si) => { const sy = t.symbol || t.mint.slice(0, 4);
+      ev.push({ ts: t.t_open, kind: "buy", label: `BUY ${sy} ${money(t.size, 0)}`, si });
+      if (t.t_close) ev.push({ ts: t.t_close, kind: (t.pnl_usd || 0) >= 0 ? "tp" : "stop", label: `${sy} ${sgn0(t.pnl_usd)}`, si }); });
+    return ev.sort((a, b) => a.ts - b.ts);
+  }
+  const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  function speedAt(t) {
+    let d = Infinity, ev = null; for (const e of R.ev || []) { const x = Math.abs(t - e.ts); if (x < d) { d = x; ev = e; } }
+    const H = R.v0 * 0.12, L = R.v0 * 2.6;                                           // hold radius (~2.4 s at 0.1x) and ease radius (~2.6 s at normal speed)
+    return { f: !ev || d >= L ? 1 : d <= H ? 0.1 : 0.1 + 0.9 * smooth((d - H) / (L - H)), d, ev, H, L };
+  }
+  function updLabel() {
+    const el = $("#rpLab"); if (!el) return; const s = speedAt(R.pos);
+    const k = s.ev && s.d < s.L && s.f < 0.97 ? (s.d <= s.H * 1.4 ? "hit" : "pre") + "|" + s.ev.label + "|" + s.ev.kind : "";
+    if (el.dataset.k === k) return; el.dataset.k = k; R.curEv = k ? s.ev : null;
+    if (!k) { el.textContent = ""; el.className = "rplab"; return; }
+    el.textContent = s.ev.label; el.className = "rplab " + k.split("|")[0]; el.style.setProperty("--c", KC[s.ev.kind] || "#a27df7");
   }
   const jump = (dir) => { const ts = R.marks.filter((t) => t >= R.t0 && t <= R.t1); let t = dir > 0 ? ts.find((x) => x > R.pos + 0.5) : [...ts].reverse().find((x) => x < R.pos - 0.5); if (t == null) t = dir > 0 ? R.t1 : R.t0; R.pos = t; frame(true); };
 
@@ -209,7 +238,7 @@ const Replay = (() => {
     r.style.setProperty("--p", (100 * (R.pos - R.t0) / span) + "%");
     $("#rNow").textContent = clock(R.pos) + " " + zone(R.pos);
     if (R.view === "trade") tradeFrame(); else windowFrame();
-    syncPlay();
+    syncPlay(); updLabel();
   }
   function setT(id, t, cls) { const e = $(id); if (!e) return; if (e.textContent !== t) e.textContent = t; if (cls != null && e.dataset.c !== cls) { e.dataset.c = cls; e.className = e.className.replace(/\b(up|down)\b/g, "").trim() + " " + cls; } }
   function tradeFrame() {
@@ -225,6 +254,7 @@ const Replay = (() => {
   }
   function showSum() { const el = $("#rpsum"), st = $(".rpstick"); if (el && R.sc && Date.now() - (R.userAt || 0) > 3500) R.sc.scrollTo({ top: Math.max(0, el.offsetTop - (st ? st.offsetHeight : 0) - 6), behavior: reduce() ? "auto" : "smooth" }); }
   function followStep(idx) {
+    const bx = $("#rpsteps"); if (!bx || bx.hidden) return;
     if (idx < 0 || !R.playing || Date.now() - (R.userAt || 0) < 3500) return;
     const el = $(`.rpstep[data-i="${idx}"]`), st = $(".rpstick"); if (!el || !R.sc) return;
     R.sc.scrollTo({ top: Math.max(0, el.offsetTop - (st ? st.offsetHeight : 0) - 6), behavior: reduce() ? "auto" : "smooth" });
@@ -239,7 +269,7 @@ const Replay = (() => {
     const idx = ts.reduce((a, t, i) => (t.t_open <= R.pos ? i : a), -1);
     ts.forEach((t, i) => { const el = $(`.rpwc[data-i="${i}"]`); if (!el) return; const c = !!(t.t_close && t.t_close <= R.pos), o = t.t_open <= R.pos;
       const key = (o ? 1 : 0) + (c ? 2 : 0) + (i === idx ? 4 : 0); if (el.dataset.k !== String(key)) { el.dataset.k = String(key); el.classList.toggle("reached", o); el.classList.toggle("closed", c); el.classList.toggle("now", i === idx); } });
-    if (idx !== R.lastStep) { R.lastStep = idx; if (idx >= 0 && R.playing && Date.now() - (R.userAt || 0) > 3500) { const el = $(`.rpwc[data-i="${idx}"]`), st = $(".rpstick"); if (el) R.sc.scrollTo({ top: Math.max(0, el.offsetTop - st.offsetHeight - 6), behavior: reduce() ? "auto" : "smooth" }); } }
+    if (idx !== R.lastStep) { R.lastStep = idx; if (idx >= 0 && R.playing && !($("#rpsteps") || {}).hidden && Date.now() - (R.userAt || 0) > 3500) { const el = $(`.rpwc[data-i="${idx}"]`), st = $(".rpstick"); if (el) R.sc.scrollTo({ top: Math.max(0, el.offsetTop - st.offsetHeight - 6), behavior: reduce() ? "auto" : "smooth" }); } }
     const done = R.pos >= R.t1 - 0.01; if (done !== R.sumOn) { R.sumOn = done; $("#rpsum").innerHTML = done ? windowSummary() : ""; if (done) showSum(); }
   }
 
@@ -255,51 +285,53 @@ const Replay = (() => {
     const ml = 6, mr = 50, mt = 14, mb = 20; R.ml = ml; R.mr = mr; const pw = w - ml - mr, ph = h - mt - mb;
     const lo0 = D._lo, hi0 = D._hi, padv = (hi0 - lo0) * 0.12 || hi0 * 0.1, lo = Math.max(lo0 - padv, 0), hi = hi0 + padv;
     const X = (t) => ml + pw * ((t - R.t0) / (R.t1 - R.t0)), Y = (p) => mt + ph * (1 - (p - lo) / (hi - lo));
-    g.font = "600 10px -apple-system,Inter,sans-serif"; g.textBaseline = "middle";
-    for (let i = 0; i <= 3; i++) { const p = lo + (hi - lo) * i / 3, y = Y(p); g.strokeStyle = "rgba(110,200,190,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke();
-      g.fillStyle = "rgba(214,234,232,.42)"; g.textAlign = "left"; g.fillText(D.supply ? compact(p * D.supply) : priceFmt(p).replace(/0+$/, ""), ml + pw + 6, y); }
+    g.font = "600 10px ui-monospace,SFMono-Regular,Menlo,monospace"; g.textBaseline = "middle";
+    for (let i = 0; i <= 3; i++) { const p = lo + (hi - lo) * i / 3, y = Y(p); g.strokeStyle = "rgba(105,112,205,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke();
+      g.fillStyle = "rgba(211,213,237,.42)"; g.textAlign = "left"; g.fillText(D.supply ? compact(p * D.supply) : priceFmt(p).replace(/0+$/, ""), ml + pw + 6, y); }
     const x0 = X(D.t_open), x1 = X(D.t_close || R.t1);                        // holding band
-    g.fillStyle = "rgba(25,230,193,.06)"; g.fillRect(x0, mt, Math.max(2, x1 - x0), ph);
-    const ey = Y(D.entry); g.setLineDash([4, 4]); g.strokeStyle = "rgba(0,194,255,.55)"; g.beginPath(); g.moveTo(ml, ey); g.lineTo(ml + pw, ey); g.stroke(); g.setLineDash([]);
-    g.fillStyle = "rgba(0,194,255,.9)"; g.textAlign = "left"; g.fillText("ENTRY", ml + 2, ey - 8);
+    g.fillStyle = "rgba(247,204,110,.06)"; g.fillRect(x0, mt, Math.max(2, x1 - x0), ph);
+    const ey = Y(D.entry); g.setLineDash([4, 4]); g.strokeStyle = "rgba(134,87,244,.55)"; g.beginPath(); g.moveTo(ml, ey); g.lineTo(ml + pw, ey); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "rgba(134,87,244,.9)"; g.textAlign = "left"; g.fillText("ENTRY", ml + 2, ey - 8);
     const px = D._px; g.lineJoin = "round"; g.lineCap = "round";
-    g.strokeStyle = "rgba(214,234,232,.22)"; g.lineWidth = 1.5; g.beginPath(); px.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();   // the whole line, faint
+    g.strokeStyle = "rgba(211,213,237,.22)"; g.lineWidth = 1.5; g.beginPath(); px.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();   // the whole line, faint
     const cur = [], past = px.filter((p) => p[0] <= R.pos); past.forEach((p) => cur.push([X(p[0]), Y(p[1])])); cur.push([X(R.pos), Y(S.price)]);
     const path = () => { g.beginPath(); cur.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); };
     const band = (y0, y1, col, fill) => { g.save(); g.beginPath(); g.rect(ml, y0, pw, y1 - y0); g.clip(); path(); g.strokeStyle = col; g.lineWidth = 2.4; g.stroke();
       g.lineTo(cur[cur.length - 1][0], mt + ph); g.lineTo(cur[0][0], mt + ph); g.closePath(); const gr = g.createLinearGradient(0, mt, 0, mt + ph); gr.addColorStop(0, fill); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fill(); g.restore(); };
-    band(0, ey, "#00f5a0", "rgba(0,245,160,.22)"); band(ey, h, "#ff4d6d", "rgba(255,77,109,.16)");
+    band(0, ey, "#f7cb6b", "rgba(247,203,107,.22)"); band(ey, h, "#ff4d6d", "rgba(255,77,109,.16)");
     const lanes = [];                                                          // label lanes: close markers stack their tags instead of overlapping
     D._marks.filter((m) => m.ts <= R.pos).forEach((m) => { const x = X(m.ts), y = Y(m.price), col = KC[m.kind]; g.strokeStyle = col; g.globalAlpha = .35; g.lineWidth = 1; g.beginPath(); g.moveTo(x, mt); g.lineTo(x, mt + ph); g.stroke(); g.globalAlpha = 1;
-      g.fillStyle = "#04090b"; g.beginPath(); g.arc(x, y, 6.5, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(x, y, 4.8, 0, 7); g.fill();
+      g.fillStyle = "#04050f"; g.beginPath(); g.arc(x, y, 6.5, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(x, y, 4.8, 0, 7); g.fill();
       const lab = KL[m.kind], tw = g.measureText(lab).width + 10, lx = Math.min(Math.max(x - tw / 2, ml), ml + pw - tw);
       let ln = 0; while (lanes[ln] != null && lanes[ln] > lx - 3) ln++; lanes[ln] = lx + tw;
       const up = y > mt + ph / 2, ly = Math.min(Math.max(up ? y - 18 - ln * 18 : y + 18 + ln * 18, mt + 8), mt + ph - 8);
-      g.fillStyle = "rgba(4,9,11,.9)"; rr(g, lx, ly - 8, tw, 16, 8); g.fill(); g.strokeStyle = col; g.lineWidth = 1; g.stroke(); g.fillStyle = col; g.textAlign = "center"; g.fillText(lab, lx + tw / 2, ly + .5); });
-    const hx = X(R.pos), hy = Y(S.price); g.strokeStyle = "rgba(177,140,255,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
-    g.shadowColor = "#b18cff"; g.shadowBlur = 10; g.fillStyle = "#fff"; g.beginPath(); g.arc(hx, hy, 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
-    g.fillStyle = "rgba(214,234,232,.40)"; g.textAlign = "center"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3 + (i === 0 ? 0 : i === 3 ? 0 : 0), h - 7); }
-    if (D.synthetic) { g.fillStyle = "rgba(255,166,43,.9)"; g.textAlign = "center"; g.fillText("no price history was saved for this trade", ml + pw / 2, mt + ph / 2); }
+      g.fillStyle = "rgba(4,5,15,.9)"; rr(g, lx, ly - 8, tw, 16, 8); g.fill(); g.strokeStyle = col; g.lineWidth = 1; g.stroke(); g.fillStyle = col; g.textAlign = "center"; g.fillText(lab, lx + tw / 2, ly + .5); });
+    const hx = X(R.pos), hy = Y(S.price); g.strokeStyle = "rgba(163,127,247,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
+    g.shadowColor = "#a37ff7"; g.shadowBlur = 10; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, hy, 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
+    { const txt = D.supply ? compact(S.price * D.supply) : priceFmt(S.price), tw = Math.min(mr - 1, g.measureText(txt).width + 8), ty = hy; g.fillStyle = S.price >= D.entry ? "#ff9752" : "#ff5c7a"; rr(g, ml + pw + 1, ty - 8, tw, 16, 3); g.fill(); g.fillStyle = "#1a1204"; g.textAlign = "left"; g.fillText(txt, ml + pw + 5, ty + .5); }
+    g.fillStyle = "rgba(211,213,237,.40)"; g.textAlign = "center"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3 + (i === 0 ? 0 : i === 3 ? 0 : 0), h - 7); }
+    if (D.synthetic) { g.fillStyle = "rgba(255,128,43,.9)"; g.textAlign = "center"; g.fillText("no price history was saved for this trade", ml + pw / 2, mt + ph / 2); }
   }
   function drawWindow(bal) {
     const c = $("#rpc"); if (!c) return; const k = setup(c, innerHeight < 700 ? 170 : 214); if (!k) return; const { g, w, h } = k;
     const ml = 6, mr = 52, mt = 14, mb = 20; R.ml = ml; R.mr = mr; const pw = w - ml - mr, ph = h - mt - mb;
     const vals = R.pts.map((p) => p[1]); let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.12 || hi * 0.02; lo -= pad; hi += pad;
     const X = (t) => ml + pw * ((t - R.t0) / (R.t1 - R.t0)), Y = (v) => mt + ph * (1 - (v - lo) / (hi - lo));
-    g.font = "600 10px -apple-system,Inter,sans-serif"; g.textBaseline = "middle";
-    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3, y = Y(v); g.strokeStyle = "rgba(110,200,190,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.fillStyle = "rgba(214,234,232,.42)"; g.textAlign = "left"; g.fillText(money(v, 0), ml + pw + 6, y); }
-    const sy = Y(R.start); g.setLineDash([4, 4]); g.strokeStyle = "rgba(0,194,255,.5)"; g.beginPath(); g.moveTo(ml, sy); g.lineTo(ml + pw, sy); g.stroke(); g.setLineDash([]);
-    g.lineJoin = "round"; g.strokeStyle = "rgba(214,234,232,.22)"; g.lineWidth = 1.5; g.beginPath(); R.pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();
+    g.font = "600 10px ui-monospace,SFMono-Regular,Menlo,monospace"; g.textBaseline = "middle";
+    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3, y = Y(v); g.strokeStyle = "rgba(105,112,205,.10)"; g.lineWidth = 1; g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.fillStyle = "rgba(211,213,237,.42)"; g.textAlign = "left"; g.fillText(money(v, 0), ml + pw + 6, y); }
+    const sy = Y(R.start); g.setLineDash([4, 4]); g.strokeStyle = "rgba(134,87,244,.5)"; g.beginPath(); g.moveTo(ml, sy); g.lineTo(ml + pw, sy); g.stroke(); g.setLineDash([]);
+    g.lineJoin = "round"; g.strokeStyle = "rgba(211,213,237,.22)"; g.lineWidth = 1.5; g.beginPath(); R.pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();
     const cur = R.pts.filter((p) => p[0] <= R.pos).map((p) => [X(p[0]), Y(p[1])]); cur.push([X(R.pos), Y(bal)]);
     const path = () => { g.beginPath(); cur.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); };
     const band = (y0, y1, col, fill) => { g.save(); g.beginPath(); g.rect(ml, y0, pw, y1 - y0); g.clip(); path(); g.strokeStyle = col; g.lineWidth = 2.4; g.stroke(); g.lineTo(cur[cur.length - 1][0], mt + ph); g.lineTo(cur[0][0], mt + ph); g.closePath();
       const gr = g.createLinearGradient(0, mt, 0, mt + ph); gr.addColorStop(0, fill); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fill(); g.restore(); };
-    band(0, sy, "#00f5a0", "rgba(0,245,160,.22)"); band(sy, h, "#ff4d6d", "rgba(255,77,109,.16)");
-    for (const t of R.trades) { if (t.t_open > R.pos) continue; const x = X(t.t_open), y = Y(priceAt(R.pts, t.t_open)); g.fillStyle = "rgba(0,194,255,.8)"; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill();
-      if (t.t_close && t.t_close <= R.pos) { const x2 = X(t.t_close), y2 = Y(priceAt(R.pts, t.t_close)), win = (t.pnl_usd || 0) >= 0; g.fillStyle = "#04090b"; g.beginPath(); g.arc(x2, y2, 5.4, 0, 7); g.fill(); g.fillStyle = win ? "#00f5a0" : "#ff4d6d"; g.beginPath(); g.arc(x2, y2, 4, 0, 7); g.fill(); } }
-    const hx = X(R.pos); g.strokeStyle = "rgba(177,140,255,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
-    g.shadowColor = "#b18cff"; g.shadowBlur = 10; g.fillStyle = "#fff"; g.beginPath(); g.arc(hx, Y(bal), 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
-    g.fillStyle = "rgba(214,234,232,.40)"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3, h - 7); }
+    band(0, sy, "#f7cb6b", "rgba(247,203,107,.22)"); band(sy, h, "#ff4d6d", "rgba(255,77,109,.16)");
+    for (const t of R.trades) { if (t.t_open > R.pos) continue; const x = X(t.t_open), y = Y(priceAt(R.pts, t.t_open)); g.fillStyle = "rgba(134,87,244,.8)"; g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill();
+      if (t.t_close && t.t_close <= R.pos) { const x2 = X(t.t_close), y2 = Y(priceAt(R.pts, t.t_close)), win = (t.pnl_usd || 0) >= 0; g.fillStyle = "#04050f"; g.beginPath(); g.arc(x2, y2, 5.4, 0, 7); g.fill(); g.fillStyle = win ? "#f7cb6b" : "#ff4d6d"; g.beginPath(); g.arc(x2, y2, 4, 0, 7); g.fill(); } }
+    const hx = X(R.pos); g.strokeStyle = "rgba(163,127,247,.8)"; g.lineWidth = 1.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(hx, mt - 2); g.lineTo(hx, mt + ph); g.stroke(); g.setLineDash([]);
+    g.shadowColor = "#a37ff7"; g.shadowBlur = 10; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(hx, Y(bal), 4.2, 0, 7); g.fill(); g.shadowBlur = 0;
+    { const txt = money(bal, 0), tw = Math.min(mr - 1, g.measureText(txt).width + 8), ty = Y(bal); g.fillStyle = bal >= R.start ? "#ff9752" : "#ff5c7a"; rr(g, ml + pw + 1, ty - 8, tw, 16, 3); g.fill(); g.fillStyle = "#1a1204"; g.textAlign = "left"; g.fillText(txt, ml + pw + 5, ty + .5); }
+    g.fillStyle = "rgba(211,213,237,.40)"; for (let i = 0; i <= 3; i++) { const t = R.t0 + (R.t1 - R.t0) * i / 3; g.textAlign = i === 0 ? "left" : i === 3 ? "right" : "center"; g.fillText(hhmm(t), ml + pw * i / 3, h - 7); }
   }
 
   // ---------- steps ----------
@@ -322,7 +354,7 @@ const Replay = (() => {
     else if (s.kind === "result") { title = `Closed · ${D.pnl_usd != null ? signed(D.pnl_usd) : ""}${D.pnl_pct != null ? " (" + pct(D.pnl_pct, 0) + ")" : ""}`; det = `Held ${dur(D.t_close - D.t_open)}${D.reason ? " · exit: " + esc(D.reason) : ""}`; }
     return `<div class="rpstep" data-i="${i}" data-t="${s.ts}" style="--c:${col}"><i class="dot"></i><div class="sb"><div class="sh"><span class="bn">${esc(botName(s.bot))}</span><span class="st">${clock(s.ts)}</span></div><div class="stt">${title}</div><div class="det">${det}</div></div></div>`;
   }
-  const winCardHtml = (t, i) => `<button class="rpwc" data-i="${i}" data-rp="trade" data-id="${t.id}"><div class="sb"><div class="sh"><span class="bn">${esc(t.symbol || t.mint.slice(0, 4))}${t.starship ? " 🚀" : ""}</span><span class="st">${hhmm(t.t_open)}${t.t_close ? " → " + hhmm(t.t_close) : ""}</span></div>
+  const winCardHtml = (t, i) => `<button class="rpwc" data-i="${i}" data-rp="trade" data-id="${t.id}"><div class="sb"><div class="sh"><span class="bn">${esc(t.symbol || t.mint.slice(0, 4))}${t.starship ? " ✦" : ""}</span><span class="st">${hhmm(t.t_open)}${t.t_close ? " → " + hhmm(t.t_close) : ""}</span></div>
     <div class="stt">Bought ${money(t.size, 0)}</div><div class="det"><span class="res">${t.t_close ? `<b class="${(t.pnl_usd || 0) >= 0 ? "up" : "down"}">${signed(t.pnl_usd)} (${pct(t.pnl_pct, 0)})</b> · ${esc(t.reason || "")} · ${dur(t.t_close - t.t_open)}` : "still holding"}</span></div></div><span class="wgo">▶</span></button>`;
 
   // ---------- summaries ----------
@@ -362,6 +394,12 @@ const Replay = (() => {
     else if (a === "prev") { R.playing = false; jump(-1); }
     else if (a === "next") { R.playing = false; jump(1); }
     else if (a === "again") { R.pos = R.t0; R.lastStep = -2; R.sumOn = false; $("#rpsum").innerHTML = ""; R.sc.scrollTo({ top: 0 }); play(); }
+    else if (a === "steps") {
+      const box = $("#rpsteps"), more = $("#rpMore"); if (!box) return; const lab = t.id === "rpLab";
+      if (lab && !R.curEv) return; box.hidden = lab ? false : !box.hidden; if (more) more.classList.toggle("open", !box.hidden);
+      if (lab && R.curEv) { const el = $(`${R.view === "trade" ? ".rpstep" : ".rpwc"}[data-i="${R.curEv.si}"]`), st = $(".rpstick");
+        if (el && R.sc) { R.playing = false; syncPlay(); R.sc.scrollTo({ top: Math.max(0, el.offsetTop - (st ? st.offsetHeight : 0) - 6), behavior: "smooth" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1400); } }
+    }
     else if (a === "speed") { R.speed = +t.dataset.s; root.querySelectorAll(".spd2 button").forEach((b) => b.classList.toggle("on", +b.dataset.s === R.speed)); }
     else if (a === "coin") { const m = t.dataset.m; close(); B.openCoin(m); }
   }

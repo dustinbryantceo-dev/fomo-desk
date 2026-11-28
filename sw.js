@@ -1,7 +1,7 @@
 // sw.js - app shell for the home-screen app. Network first (a new deploy shows at once), cache as fallback.
 // Never caches the encrypted desk data (raw.githubusercontent.com): stale numbers must look stale.
-const CACHE = "desk-shell-v24-clock";
-const SHELL = ["./", "index.html", "app.css", "app.js", "chart.js", "replay.js", "desk-crypto.js", "manifest.json", "icons/apple-touch-icon.png", "icons/icon-192.png", "rocket-logo.png", "rocket-real.png", "rocket-green.png", "rocket-red.png", "rocket-blue.png"];
+const CACHE = "desk-shell-v25-yobel";
+const SHELL = ["./", "index.html", "app.css", "app.js", "chart.js", "replay.js", "yobel.css", "yobel.js", "desk-crypto.js", "manifest.json", "icons/apple-touch-icon.png", "icons/icon-192.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("message", (e) => { if (e.data === "SKIP_WAITING") self.skipWaiting(); });
@@ -20,7 +20,7 @@ self.addEventListener("fetch", (e) => {
 // Payload {title, body, event, tag, url "./?tab=..."}; no secrets, no desk data beyond the line itself.
 self.addEventListener("push", (e) => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "Pump Pilot", {
+  e.waitUntil(self.registration.showNotification(d.title || "Yobel", {
     body: d.body || "", icon: "icons/icon-192.png", badge: "icons/icon-192.png", tag: d.tag || "pp", renotify: true,
     timestamp: d.ts ? d.ts * 1000 : Date.now(), data: { url: d.url || "./" } }));
 });
