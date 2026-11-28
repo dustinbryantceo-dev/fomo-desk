@@ -1,5 +1,7 @@
 // app.js - Pump Pilot, the desk on the iPhone (STEP 10, restyled 2026-11-15), hosting plan B (DECISIONS #26).
 // Reads encrypted files from the public repo with desk-crypto.js, polls every 15 s (no SSE).
+// Live prices (MEM-20): between those polls the app asks DexScreener's public API for the prices of the open positions (every 2.5 s while the tab is visible)
+// and recomputes value / P&L / stop distance here from the entry price and tokens in the payload. No secrets, no desk load; Jupiter price is the fallback.
 // FOMO links are only ever the strings links.py put into the data; this file never builds one.
 (() => {
   const BASE = "https://raw.githubusercontent.com/dustinbryantceo-dev/fomo-desk/data";
@@ -75,6 +77,131 @@
     [...text].forEach((c, i) => { const col = cols[i] && cols[i].querySelector(".col"); if (col && /\d/.test(c) && c !== prev[i]) { col.style.transitionDelay = (k++ * 30) + "ms"; col.style.transform = `translateY(-${c}em)`; } else if (!col && c !== prev[i]) cols[i].textContent = c; });
   }
 
+
+  // ---------- live prices (MEM-20): public DexScreener, computed on this phone; the desk's own exit logic is untouched ----------
+  const DEXQ = "https://api.dexscreener.com/tokens/v1/solana/", JUPQ = "https://lite-api.jup.ag/price/v3?ids=";
+  const LV_EVERY = 2500, LV_FRESH = 12000, LV_FRESH_OTHER = 25000, LV_OTHER_EVERY = 9000, LV_JUP_EVERY = 10000, MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  const LV = { px: {}, hi: {}, last: 0, fails: 0, busy: false, timer: null, jupAt: 0, src: "" };
+  const lvQ = (m, max = LV_FRESH) => { const q = LV.px[m]; return q && Date.now() - q.t < max ? q : null; };
+  // value / P&L / stop distance for one open position: live price when we have a fresh one, the published numbers otherwise
+  function posLive(p) {
+    const q = lvQ(p.mint), price = q ? q.price : p.price, live = !!q;
+    const value = live && p.tokens != null ? p.tokens * price : p.value_usd;
+    const pnl = value != null && p.size_usd != null ? value - p.size_usd : null;
+    const chg = live && p.entry_price ? 100 * (price / p.entry_price - 1) : p.change_pct;
+    const hi = Math.max(p.peak_price || 0, live ? (LV.hi[p.id] = Math.max(LV.hi[p.id] || 0, price)) : (LV.hi[p.id] || 0));
+    const peakPct = hi && p.entry_price ? 100 * (hi / p.entry_price - 1) : null;
+    const toStop = price && p.stop_price ? 100 * (p.stop_price / price - 1) : null;
+    return { price, live, value, pnl, chg, peakPct, toStop };
+  }
+  const stopLine = (p, L) => [L.toStop == null ? null : L.toStop >= 0 ? "at stop" : L.toStop.toFixed(1) + "% to stop", L.peakPct != null ? "peak " + pct(L.peakPct, 0) : null].filter(Boolean).join(" · ");
+  // hero numbers: balance moves with the open positions' price change since the last published frame
+  function heroLive(st) {
+    const pos = st.positions || []; let val = 0, pnl = 0, dv = 0, any = false;
+    pos.forEach((p) => { const L = posLive(p); val += L.value || 0; if (L.pnl != null) pnl += L.pnl; if (L.live && L.value != null && p.value_usd != null) { dv += L.value - p.value_usd; any = true; } });
+    const bal = st.balance != null ? st.balance + dv : null, start = st.night_start_balance;
+    return { n: pos.length, val, pnl, bal, any,
+      delta: bal != null && start != null ? bal - start : null,
+      pct: bal != null && start ? 100 * (bal / start - 1) : st.today_pct,
+      mult: bal != null && start ? bal / start : st.multiplier };
+  }
+  const heroChg = (H) => { const up = (H.pct || 0) >= 0; return `${up ? "▲" : "▼"} ${H.delta != null ? signedMoney(H.delta) + " · " : ""}${pct(H.pct)}`; };
+  function coinLive(c) {
+    const q = lvQ(c.mint || (S.stack[S.stack.length - 1] || {}).mint), price = q ? q.price : c.price, p = c.position;
+    return { price, live: !!q, since: p && p.entry_price && price ? 100 * (price / p.entry_price - 1) : null };
+  }
+  const xLive = (m) => { const q = lvQ(m, LV_FRESH_OTHER); return q ? `${priceFmt(q.price)}${q.h1 != null ? " · 1h " + pct(q.h1, 0) : ""}` : ""; };
+  function tradeLive(r) {
+    if (r.kind !== "bought") return "";
+    const p = ((S.state && S.state.positions) || []).find((x) => x.mint === r.mint && Math.abs((x.opened_at || 0) - r.ts) < 300); if (!p) return "";
+    const L = posLive(p); return L.chg == null ? "" : ` · now ${pct(L.chg, 1)}`;
+  }
+  function lvMints() {
+    const pri = [], oth = [], add = (a, m) => { if (typeof m === "string" && MINT_RE.test(m) && !pri.includes(m) && !oth.includes(m)) a.push(m); };
+    ((S.state && S.state.positions) || []).forEach((p) => add(pri, p.mint));
+    const top = S.stack[S.stack.length - 1]; if (top && top.kind === "coin") add(pri, top.mint);
+    if (S.tab === "home" && !S.stack.length) (((S.files["x_trends"] || {}).rows) || []).slice(0, 20).forEach((r) => add(oth, r.mint));
+    return { pri, oth };
+  }
+  async function lvDex(mints) {
+    const out = {}, chunks = [];
+    for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+    await Promise.all(chunks.map(async (ch) => {
+      const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 4000);
+      try {
+        const r = await fetch(DEXQ + ch.join(",") + "?_=" + Math.floor(Date.now() / 2000), { mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal });
+        if (!r.ok) throw new Error("dex " + r.status);
+        const best = {}, other = {};
+        for (const pr of (await r.json()) || []) {                 // same pick as the desk: the biggest pumpswap pool, else the biggest pool of any dex
+          const m = pr && pr.baseToken && pr.baseToken.address, px = +pr.priceUsd; if (!ch.includes(m) || !(px > 0)) continue;
+          const liq = (pr.liquidity && pr.liquidity.usd) || 0, tgt = pr.dexId === "pumpswap" ? best : other;
+          if (!tgt[m] || liq > tgt[m].liq) tgt[m] = { price: px, liq, h1: pr.priceChange && pr.priceChange.h1 != null ? +pr.priceChange.h1 : null };
+        }
+        for (const m of Object.keys(other)) if (!best[m]) best[m] = other[m];
+        Object.assign(out, best);
+      } finally { clearTimeout(tm); }
+    }));
+    return out;
+  }
+  async function lvJup(mints) {       // fallback for held coins DexScreener didn't answer for (the free endpoint is rate limited: at most every 10 s)
+    if (!mints.length || Date.now() - LV.jupAt < LV_JUP_EVERY) return {};
+    LV.jupAt = Date.now(); const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 4000), out = {};
+    try {
+      const r = await fetch(JUPQ + mints.slice(0, 50).join(","), { mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal });
+      if (r.ok) { const j = await r.json(); for (const m of mints) { const px = j && j[m] && +j[m].usdPrice; if (px > 0) out[m] = { price: px, h1: null }; } }
+    } catch {} finally { clearTimeout(tm); }
+    return out;
+  }
+  async function lvTick() {
+    if (LV.busy || document.hidden || !S.state || !S.dp) return;
+    const { pri, oth } = lvMints(), now = Date.now();
+    const due = pri.concat(oth.filter((m) => !LV.px[m] || now - LV.px[m].t >= LV_OTHER_EVERY));
+    if (!due.length) return;
+    LV.busy = true;
+    try {
+      const got = await lvDex(due); let src = "DexScreener";
+      const miss = pri.filter((m) => !got[m] && !lvQ(m)); if (miss.length) { const j = await lvJup(miss); if (Object.keys(j).length) { Object.assign(got, j); src = "Jupiter"; } }
+      const t = Date.now(); for (const m of Object.keys(got)) LV.px[m] = Object.assign({ t }, got[m]);
+      if (Object.keys(got).length) { LV.last = t; LV.src = src; }
+      LV.fails = 0;
+    } catch { LV.fails++; }
+    LV.busy = false; lvPaint();
+  }
+  function lvLoop() {
+    clearTimeout(LV.timer);
+    if (document.hidden) return;                        // tab hidden: no polling at all
+    lvTick().finally(() => { clearTimeout(LV.timer); LV.timer = setTimeout(lvLoop, Math.min(15000, LV_EVERY * 2 ** Math.min(LV.fails, 3))); });
+  }
+  function lvStart() { lvLoop(); document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(LV.timer); else lvLoop(); }); }
+  function lvChip() {
+    const age = Date.now() - LV.last, live = LV.last && age < 10000;
+    document.querySelectorAll("[data-lvchip]").forEach((el) => {
+      const html = !LV.last ? "" : live ? `<i></i>Live · ${hms(LV.last / 1000)}` : `<i></i>Delayed · ${hms(LV.last / 1000)}`;
+      if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+      el.className = "lvchip" + (!LV.last ? " off" : live ? " on" : " late"); el.title = live ? "Prices from " + LV.src + ", updated every few seconds" : "Live prices paused or slow: showing the desk's last published prices";
+    });
+  }
+  function lvPaint() {
+    lvChip(); const st = S.state; if (!st) return;
+    const set = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
+    for (const p of st.positions || []) {
+      const row = document.querySelector(`.prow[data-mint="${p.mint}"]`); if (!row) continue;
+      const L = posLive(p), up = (L.chg || 0) >= 0;
+      set($(".pval", row), money(L.value)); const c = $(".pchg", row); if (c) { set(c, `${L.pnl == null ? "–" : signedMoney(L.pnl)} · ${pct(L.chg, 1)}`); c.className = (up ? "up" : "down") + " pchg"; }
+      set($(".plv", row), stopLine(p, L)); row.classList.toggle("gain", up); row.classList.toggle("loss", !up);
+    }
+    const H = heroLive(st), hc = $("#hchg");
+    if (hc) { set(hc, heroChg(H)); hc.className = "chg " + ((H.pct || 0) >= 0 ? "up" : "down"); }
+    set($("#hmult"), H.mult != null ? H.mult.toFixed(2) + "×" : "");
+    set($("#hpos"), H.n ? money(H.val) : "$0.00"); const hp = $("#hpnl"); if (hp) { set(hp, H.n ? signedMoney(H.pnl) : "–"); hp.className = H.pnl >= 0 ? "up" : "down"; }
+    const bal = $("#bal"); if (bal && H.bal != null) tween(bal, H.bal);
+    const top = S.stack[S.stack.length - 1];
+    if (top && top.kind === "coin") { const c = S.files["coin/" + top.mint]; if (c) { const L = coinLive(Object.assign({ mint: top.mint }, c));
+      set($("#cprice"), priceFmt(L.price)); const pp = c.position; if (pp && L.live && pp.tokens != null) set($("#cpval"), "now " + money(pp.tokens * L.price)); const td = $("#ctoday"); if (td && L.since != null) { td.innerHTML = `<span class="${L.since >= 0 ? "up" : "down"}">${L.since >= 0 ? "▲" : "▼"} ${Math.abs(L.since).toFixed(2)}% since entry</span>`; } } }
+    document.querySelectorAll("[data-lvx]").forEach((el) => set(el, xLive(el.dataset.lvx)));
+    document.querySelectorAll("[data-lvt]").forEach((el) => { const r = ((S.files["activity/0"] || {}).rows || []).find((x) => String(x.id) === el.dataset.lvt); if (r) set(el, tradeLive(r)); });
+  }
+
   // ---------- router ----------
   function go(tab) { if (tab === "account" && tab !== S.tab) ctlPoll().then(() => { if (S.tab === "account") render(true); });
     const moved = tab !== S.tab || S.stack.length; S.tab = tab; S.stack = []; document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab)); render(); scrollTo(0, 0); if (moved) slideIn(); }
@@ -119,7 +246,7 @@
     if (el.textContent !== txt) el.textContent = txt; el.hidden = false;
   }
   function badgeTick() { const b = $("#mbadge"); if (b) { const h = modeBadge(); if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; } } }
-  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); maintRow(); }, 1000);
+  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); maintRow(); if (LV.last) lvPaint(); }, 1000);
 
   // ---------- views ----------
   function viewGate(kind) {
@@ -159,19 +286,19 @@
     return `<div class="trow ${cls}" data-act="coin" data-mint="${esc(r.mint)}" data-aid="${esc(r.id)}">
       <div class="tsym">${sym((r.title || "").split(" ").slice(1).join(" ") || null, r.mint)}</div>
       <div class="tmid">${tradeTag(r)}<span class="tsub">${esc((r.subtitle || "").replace(/^Executor · \d\d:\d\d$/, "Executor"))}</span></div>
-      <div class="tval ${k === "bought" ? "" : neg ? "down" : "up"}">${esc(val.split(" · ")[0])}<small>${hm(r.ts)}</small></div></div>`;
+      <div class="tval ${k === "bought" ? "" : neg ? "down" : "up"}">${esc(val.split(" · ")[0])}<small>${hm(r.ts)}<span data-lvt="${esc(r.id)}">${esc(tradeLive(r))}</span></small></div></div>`;
   }
   function feedRow(r) {
     const k = r.kind, cls = k === "bought" ? "buy" : k === "stopped" ? "stop" : k === "sold" ? (isTP(r) ? "tp" : "sell") : "skip";
     return `<div class="frow ${cls}" data-act="${k === "rejected" ? "audit" : "coin"}" data-mint="${esc(r.mint)}"><i></i><span class="ft trunc"><b>${esc(r.title)}</b> <span class="mut">${esc(r.subtitle || "")}</span></span><span class="fv">${esc(k === "rejected" ? "skip" : String(r.value || "").split(" · ")[0])}</span><span class="fts">${hm(r.ts)}</span></div>`;
   }
   function posCard(p) {
-    const pnl = p.value_usd != null && p.size_usd != null ? p.value_usd - p.size_usd : null, upp = (p.change_pct || 0) >= 0;
+    const L = posLive(p), upp = (L.chg || 0) >= 0;
     const tags = (p.starship ? '<span class="tag ss">🚀 STARSHIP</span>' : "") + (p.tp_done ? '<span class="tag tp">TP HIT</span>' : "") + (p.trail_active ? '<span class="tag sell">TRAILING</span>' : "");
     return `<div class="prow ${upp ? "gain" : "loss"}" data-act="coin" data-mint="${esc(p.mint)}">
       <div class="pic">${sym(p.symbol, p.mint).slice(0, 1)}</div>
-      <div class="ptx"><div class="psym">${sym(p.symbol, p.mint)} ${tags}</div><div class="psub">${money(p.size_usd)} in · stop ${priceFmt(p.stop_price)}${p.opened_at ? " · " + hm(p.opened_at) : ""}</div></div>
-      <div class="ppl"><div class="pval">${money(p.value_usd)}</div><div class="${upp ? "up" : "down"} pchg">${pnl == null ? "–" : signedMoney(pnl)} · ${pct(p.change_pct, 1)}</div></div></div>`;
+      <div class="ptx"><div class="psym">${sym(p.symbol, p.mint)} ${tags}</div><div class="psub">${money(p.size_usd)} in · stop ${priceFmt(p.stop_price)}${p.opened_at ? " · " + hm(p.opened_at) : ""}</div><div class="psub plv">${esc(stopLine(p, L))}</div></div>
+      <div class="ppl"><div class="pval">${money(L.value)}</div><div class="${upp ? "up" : "down"} pchg">${L.pnl == null ? "–" : signedMoney(L.pnl)} · ${pct(L.chg, 1)}</div></div></div>`;
   }
   function frameNote(scr) {
     return scr.trade_live ? '<span class="fn live"><i></i>Updating every 15s · trade live</span>' : `<span class="fn">Updating every ${scr.published_every_s || 60}s</span>`;
@@ -193,16 +320,15 @@
       return "Not scanned";
     };
     return `<h2 class="sec">X trends <span class="count">· ${rows.length}</span></h2>
-      <div class="xlist tlist glass">${rows.map((r) => `<div class="row xrow" data-act="coin" data-mint="${esc(r.mint)}"><div class="ic">${sym(r.symbol, r.mint).slice(0, 1)}</div><div class="tx"><div class="t1">${sym(r.symbol, r.mint)} <span class="dir">${men(r)} ${arrow(r)}</span>${r.hype ? '<span class="tag hype">⚠ safety</span>' : ""}</div><div class="t2">First ${hm(r.first_ts)} · ${verdict(r)}</div></div><div class="rv">${fomoA(r.link, "FOMO")}</div></div>`).join("")}</div>`;
+      <div class="xlist tlist glass">${rows.map((r) => `<div class="row xrow" data-act="coin" data-mint="${esc(r.mint)}"><div class="ic">${sym(r.symbol, r.mint).slice(0, 1)}</div><div class="tx"><div class="t1">${sym(r.symbol, r.mint)} <span class="dir">${men(r)} ${arrow(r)}</span>${r.hype ? '<span class="tag hype">⚠ safety</span>' : ""}</div><div class="t2">First ${hm(r.first_ts)} · ${verdict(r)}</div></div><div class="rv"><span class="lvx" data-lvx="${esc(r.mint)}">${esc(xLive(r.mint))}</span>${fomoA(r.link, "FOMO")}</div></div>`).join("")}</div>`;
   }
 
   function viewHome() {
     const st = S.state, a = (S.files["activity/0"] || { rows: [] }).rows, chart = S.files["chart/" + S.range];
-    const up = (st.today_pct || 0) >= 0, unseen = a.length && a[0].ts > +(localStorage.getItem("desk.seen") || 0);
+    const up = ((heroLive(st).pct) || 0) >= 0, unseen = a.length && a[0].ts > +(localStorage.getItem("desk.seen") || 0);
     const lastO = st.last_order, scr = st.screen || {};
     const trades = a.filter((r) => r.kind === "bought" || r.kind === "sold" || r.kind === "stopped");
-    const delta = st.balance != null && st.night_start_balance != null ? st.balance - st.night_start_balance : null;
-    const pos = st.positions || [], posPnl = pos.reduce((s, p) => s + (p.value_usd != null && p.size_usd != null ? p.value_usd - p.size_usd : 0), 0);
+        const pos = st.positions || [], H = heroLive(st);
     const running = (st.bots || []).filter((b) => b.status === "running" || b.status === "degraded").length;
     return `
       <header class="pphead">
@@ -215,16 +341,16 @@
       <div id="searchbox"></div>
       <div class="home">
         <section class="hero glass${S.rp ? " replaying" : ""}" id="hero">
-          <div class="hlab">Total balance <span class="ter">· ${esc(st.balance_source || "")}</span></div>
+          <div class="hlab">Total balance <span class="ter">· ${esc(st.balance_source || "")}</span><span class="lvchip off" data-lvchip></span></div>
           <div class="balance"><span id="bal" class="tw"></span></div>
           <div class="hrow">
-            ${st.today_pct != null ? `<span class="chg ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${delta != null ? signedMoney(delta) + " · " : ""}${pct(st.today_pct)}</span><span class="mut">vs night start</span>` : '<span class="mut">No night start yet</span>'}
-            ${st.multiplier != null ? `<span class="pill mult">${st.multiplier.toFixed(2)}×</span>` : ""}
+            ${H.pct != null ? `<span class="chg ${up ? "up" : "down"}" id="hchg">${heroChg(H)}</span><span class="mut">vs night start</span>` : '<span class="mut">No night start yet</span>'}
+            ${H.mult != null ? `<span class="pill mult" id="hmult">${H.mult.toFixed(2)}×</span>` : ""}
           </div>
           <div class="hstats">
             <div><span>Cash</span><b>${money(st.cash)}</b></div>
-            <div><span>Positions</span><b>${pos.length ? money(pos.reduce((s, p) => s + (p.value_usd || 0), 0)) : "$0.00"}</b></div>
-            <div><span>Open P&amp;L</span><b class="${posPnl >= 0 ? "up" : "down"}">${pos.length ? signedMoney(posPnl) : "–"}</b></div>
+            <div><span>Positions</span><b id="hpos">${pos.length ? money(H.val) : "$0.00"}</b></div>
+            <div><span>Open P&amp;L</span><b id="hpnl" class="${H.pnl >= 0 ? "up" : "down"}">${pos.length ? signedMoney(H.pnl) : "–"}</b></div>
           </div>
           <div class="chartbox"><canvas id="bchart"></canvas>${!S.rp && (!chart || (chart.points || []).length < 2) ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}
             ${S.rp ? `<span class="rpbadge"><i></i>REPLAY <small>${esc(S.rp.range)} · ${S.rp.speed}x</small></span>` : `<button class="rpbtn" data-act="replay" aria-label="Replay this range">▶ Play</button>`}
@@ -588,15 +714,15 @@
     const c = S.files["coin/" + mint];
     if (c === undefined) return backBar("Back") + sk(34, "60%") + sk(20, "40%", 8) + sk(48, "50%", 12, 16) + sk(220) + `<div class="stats">${sk(52, "auto", 14, 0).repeat(3)}</div>`;
     if (c === null) return backBar("Back") + `<div class="empty"><b>Not published</b>The desk only publishes coins it looked at tonight.</div>`;
-    const p = c.position, since = p && p.entry_price && c.price ? 100 * (c.price / p.entry_price - 1) : null;
+    const p = c.position, CL = coinLive(Object.assign({ mint }, c)), since = CL.since;
     return `${backBar("Back")}
       <div class="coinhead"><div class="nm">${esc(c.name || c.symbol)}</div>${paperPill()}</div>
-      <div class="sub">${sym(c.symbol, mint)} · ${esc(c.chain)} · ${age(c.created_at)} <span class="shield">${ICON.shield}${esc(c.shield)}</span></div>
-      <div class="price">${priceFmt(c.price)}</div>
-      ${since != null ? `<div class="today"><span class="${since >= 0 ? "up" : "down"}">${since >= 0 ? "▲" : "▼"} ${Math.abs(since).toFixed(2)}% since entry</span></div>` : `<div class="today mut" style="font-size:15px">Price ${c.price_ts ? "at " + hm(c.price_ts) : "–"}</div>`}
+      <div class="sub">${sym(c.symbol, mint)} · ${esc(c.chain)} · ${age(c.created_at)} <span class="shield">${ICON.shield}${esc(c.shield)}</span><span class="lvchip off" data-lvchip></span></div>
+      <div class="price" id="cprice">${priceFmt(CL.price)}</div>
+      ${since != null ? `<div class="today" id="ctoday"><span class="${since >= 0 ? "up" : "down"}">${since >= 0 ? "▲" : "▼"} ${Math.abs(since).toFixed(2)}% since entry</span></div>` : `<div class="today mut" style="font-size:15px">Price ${c.price_ts ? "at " + hm(c.price_ts) : "–"}</div>`}
       <div class="chartbox" style="height:220px;margin-top:10px"><canvas id="cchart"></canvas>${(c.candles || []).length ? "" : '<div class="chartnote">No price data yet</div>'}</div>
       <div class="stats"><div><span>Market cap</span><b>${compact(c.market_cap_usd)}</b></div><div><span>Liquidity</span><b>${compact(c.liquidity_usd)}</b></div><div><span>Holders</span><b>${c.holders != null ? c.holders.toLocaleString() : "–"}</b></div></div>
-      ${p ? `<div class="card poscard"><div class="tx" style="flex:1"><div class="t1">Your position · ${money(p.size_usd)} in · Executor</div><div class="t2 mut" style="font-size:13px;margin-top:3px">now ${money(p.value_usd)} · stop ${priceFmt(c.exit_line)}</div></div></div>` : `<div class="card poscard"><span class="mut">No open position</span></div>`}
+      ${p ? `<div class="card poscard"><div class="tx" style="flex:1"><div class="t1">Your position · ${money(p.size_usd)} in · Executor</div><div class="t2 mut" style="font-size:13px;margin-top:3px"><span id="cpval">now ${money(CL.live && p.tokens != null ? p.tokens * CL.price : p.value_usd)}</span> · stop ${priceFmt(c.exit_line)}</div></div></div>` : `<div class="card poscard"><span class="mut">No open position</span></div>`}
       <div class="btns">${fomoLink(c.link) ? `<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : ""}
         ${p && !S.viewer ? `<button class="btn red" data-act="sell" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Sell…</button>`
             : canCtl() && String(c.chain || "solana").toLowerCase() === "solana" ? `<button class="btn primary" data-act="buy" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Buy…</button>` : ""}</div>
@@ -774,7 +900,8 @@
   let prevChart = null;
   function after() {
     const bal = $("#bal");
-    if (bal && S.state) tween(bal, S.state.balance);
+    if (bal && S.state) tween(bal, heroLive(S.state).bal);
+    lvChip();
     const bc = $("#bchart"); if (bc) { if (S.rp) rpDraw(); else { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; } }
     const top = S.stack[S.stack.length - 1];
     const cc = $("#cchart"); if (cc && top) { const c = S.files["coin/" + top.mint]; if (c) Charts.candles(cc, c.candles, c.exit_line, c.position && c.position.entry_price); }
@@ -1692,6 +1819,7 @@
     if (S.viewer) viewerHello();
     if (wantDemo) setTimeout(fxDemo, 600);
     setInterval(poll, POLL_S * 1000);
+    lvStart();
     setInterval(() => { const g = $("#gaten"); if (g) g.textContent = Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000)); }, 1000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   }
@@ -1702,6 +1830,7 @@
     if (fx.screen) { S.screenUrl = fx.screen; }
     fxDiff(S.state, S.files["activity/0"]);
     render();
+    if (window.__LIVE_TEST) lvStart();
     window.__ppFixtureStep = (nx) => { S.state = nx.state; for (const [k, v] of Object.entries(nx.files || {})) S.files[k] = v; fxDiff(S.state, S.files["activity/0"]); render(true); };
   }
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

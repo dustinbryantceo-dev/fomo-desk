@@ -578,3 +578,17 @@ html.tg .tabbar{padding-bottom:calc(6px + var(--sb))}
 .vonly{padding:14px 16px;border-radius:var(--r-lg);border:1px solid rgba(120,170,255,.35);margin:4px 0 8px}
 .vonly .t1{font-weight:800;color:#cfe3ff}.vonly .t2{color:var(--sec);font-size:var(--fs-sm);margin-top:4px;white-space:normal}
 html.viewer .iconbtn[data-act="bots"]{display:none}
+
+/* live prices (MEM-20) */
+.lvchip{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 8px;border-radius:999px;font:600 11px var(--txt);text-transform:none;letter-spacing:0;white-space:nowrap;vertical-align:middle;background:rgba(255,255,255,.05);color:var(--ter)}
+.lvchip.off{display:none}
+.lvchip i{width:6px;height:6px;border-radius:50%;background:#8e8e93}
+.lvchip.on{color:var(--green);background:rgba(0,245,160,.1)}
+.lvchip.on i{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.2s infinite}
+.lvchip.late{color:var(--orange);background:rgba(255,159,10,.12)}
+.lvchip.late i{background:var(--orange)}
+.psub.plv{margin-top:2px;font-size:11px;color:var(--ter);font-variant-numeric:tabular-nums}
+.lvx{display:block;font-size:11px;color:var(--sec);margin-bottom:3px;text-align:right;font-variant-numeric:tabular-nums}
+.lvx:empty{display:none}
+.tval small span{color:var(--sec)}
+@media (prefers-reduced-motion:reduce){.lvchip.on i{animation:none}}
