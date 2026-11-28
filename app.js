@@ -583,8 +583,8 @@
     const st = `<span class="sdot ${esc(b.status || "off")}"></span>`;
     let body = "";
     if (b.name === "scanner") {
-      const FEED_LAB = {migration:"migrate", x_trend:"X", jup_recent:"Jupiter", launchlab:"LaunchLab", near_grad:"near-grad"};
-      const feedOrder = ["migration","x_trend","jup_recent","launchlab","near_grad"];
+      const FEED_LAB = {migration:"migrate", x_trend:"X", jup_recent:"Jupiter", launchlab:"LaunchLab", near_grad:"near-grad", smart_money:"smart money", helius_pool:"new pools"};
+      const feedOrder = ["migration","x_trend","jup_recent","launchlab","near_grad","smart_money","helius_pool"];
       const feeds = b.feeds || {};
       const feedKeys = feedOrder.filter((k) => k in feeds).concat(Object.keys(feeds).filter((k) => !feedOrder.includes(k)));
       const feedBits = feedKeys.map((k) => {
@@ -599,7 +599,7 @@
     } else if (b.name === "analyst") {
       const l = b.last; const layers = (l && l.layers) || [];
       body = `<div class="big">${b.taken_apart ?? 0} taken apart</div>` + (l ? `<div style="display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0">
-        <div class="line"><span class="trunc">${sym(l.symbol, l.mint)}</span>${l.social_pts != null ? `<span class="r">Social +${esc(l.social_pts)}</span>` : ""}</div>
+        <div class="line"><span class="trunc">${sym(l.symbol, l.mint)}</span>${l.smart_pts ? `<span class="r">🧠 Smart +${esc(l.smart_pts)}</span>` : ""}${l.social_pts != null ? `<span class="r">Social +${esc(l.social_pts)}</span>` : ""}</div>
         <div class="strips">${Array.from({ length: 8 }, (_, i) => { const x = layers[i]; return `<i class="${x && x.pass === 1 ? "ok" : x && x.pass === 0 ? "no" : ""}"></i>`; }).join("")}</div></div>
         <div style="width:56px">${Charts.ring(l.score, b.pass_score).replace('class="ring"', 'class="ring" style="width:56px;height:56px"')}</div></div>` : '<div class="line">Nothing audited yet</div>');
     } else if (b.name === "brain") {
@@ -657,6 +657,7 @@
     const s = S.files["skips"], r = s && s.recent.find((x) => x.mint === mint);
     if (!r) return `<h1 class="title">Skip</h1><div class="empty">Not in the recent skip log</div>`;
     return `<h1 class="title">${sym(r.symbol, r.mint)}</h1><div class="card"><div class="grp" style="margin:0 0 4px">Skipped ${hm(r.ts)} by ${esc(r.bot)}${r.mode === "starship" ? " · 🚀 Starship rules" : ""}</div>
+      ${r.smart ? `<div class="row" style="min-height:40px"><div class="tx"><div class="t1" style="font-size:15px">🧠 Smart money</div><div class="t2">${r.smart} watchlist wallet${r.smart > 1 ? "s" : ""} bought this coin early</div></div></div>` : ""}
       ${r.reasons.map((x) => `<div class="row" style="min-height:44px"><div class="tx"><div class="t1" style="font-size:15px">✗ ${esc(x.label)}${x.rug ? ' <span class="tag">🛡️</span>' : ""}</div><div class="t2">${esc(x.text)}</div></div>
         <div class="rv">${x.value != null && x.threshold != null ? `${esc(fmtSkip(x.value, x.filter))} <span class="mut">${esc(x.op || "")} ${esc(fmtSkip(x.threshold, x.filter))}</span>` : ""}</div></div>`).join("")}</div>
       <div class="t2" style="padding:12px 4px;word-break:break-all">${esc(r.mint)}</div>${S.files["coin/" + mint] !== undefined || (S.ix && S.ix.files["coin/" + mint]) ? `<button class="loadmore" data-act="coin" data-mint="${esc(mint)}">Open coin</button>` : ""}`;
@@ -688,7 +689,7 @@
   function skipActRow(r) {
     const x = r.reasons[0] || {}, more = r.reasons.length > 1 ? ` +${r.reasons.length - 1}` : "";
     return `<div class="row" style="min-height:44px" data-act="skip" data-mint="${esc(r.mint)}"><div class="ic" style="color:#8e8e93;opacity:.7">·</div>
-      <div class="tx"><div class="t1" style="font-size:15px">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(x.label || "")}${r.mode === "starship" ? " · 🚀" : ""}</span></div>
+      <div class="tx"><div class="t1" style="font-size:15px">${sym(r.symbol, r.mint)} <span class="mut" style="font-size:13px">${esc(x.label || "")}${r.mode === "starship" ? " · 🚀" : ""}${r.smart ? " · 🧠 smart money" : ""}</span></div>
       <div class="t2">${esc(x.text || "")}${more} · ${hm(r.ts)}</div></div><div class="rv"><span class="mut">Skipped</span></div></div>`;
   }
   function viewActivity() {
@@ -743,7 +744,7 @@
       <div class="discs">${ls.map((l, i) => `<div class="disc"><span class="beam" style="animation-delay:${i * 0.35}s"></span>
         <span class="d" data-st="${l.pass === 1 ? "ok" : l.pass === 0 ? "no" : "na"}" style="transition-delay:${i * 0.35 + 0.3}s">${l.layer}</span>
         <span class="nm">${esc(l.name)}</span><span class="val ${l.pass === 0 ? "down" : l.pass === 1 ? "" : "ter"}">${esc(l.value_text)}</span></div>`).join("")}</div>
-      <div class="social">${esc(a.social_line || "Social: off")}</div>`;
+      <div class="social">${esc(a.social_line || "Social: off")}${a.smart_line ? " · 🧠 " + esc(a.smart_line) : ""}</div>`;
   }
 
   // ---- VIEWER mode Account: read only. No mode switch, no controls, no settings, no Dustin notification prefs; only this
