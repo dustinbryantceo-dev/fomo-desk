@@ -564,7 +564,7 @@ html.tg .tabbar{padding-bottom:calc(6px + var(--sb))}
 html.viewer .iconbtn[data-act="bots"]{display:none}
 
 /* live prices (MEM-20) */
-.lvchip{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 8px;border-radius:999px;font:600 11px var(--txt);text-transform:none;letter-spacing:0;white-space:nowrap;vertical-align:middle;background:rgba(255,255,255,.05);color:var(--ter)}
+.lvchip{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 8px;border-radius:999px;font:600 11px var(--txt);text-transform:none;letter-spacing:0;white-space:nowrap;vertical-align:middle;background:rgba(255,255,255,.05);color:var(--ter);font-variant-numeric:tabular-nums}
 .lvchip.off{display:none}
 .lvchip i{width:6px;height:6px;border-radius:50%;background:#8e8e93}
 .lvchip.on{color:var(--green);background:rgba(0,245,160,.1)}

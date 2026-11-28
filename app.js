@@ -197,15 +197,18 @@
     }
     lvLoop();
   }
-  // the dot: "Live · 3s ago" ticking every second; "Delayed" only when no price request has succeeded for 10 s while we should be polling (not one slow answer)
+  // the chip is a real clock in Europe/Berlin, ticking every second: "Live · 1:50:23 PM" (green while prices are fresh, amber Delayed after a real miss)
+  const lvClock = () => {
+    try { return new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Berlin", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).format(new Date()).replace(/\u202f/g, " "); }
+    catch { return ""; }
+  };
   function lvChip() {
-    const now = Date.now(), age = LV.okAt ? now - LV.okAt : null, limit = LV.pri ? LV_LATE : 16000;
+    const now = Date.now(), age = LV.okAt ? now - LV.okAt : null, limit = LV.pri ? LV_LATE : 16000, clock = lvClock();
     document.querySelectorAll("[data-lvchip]").forEach((el) => {
       let cls, html;
-      if (age == null) { const wait = now - LV.t0 > 15000 && LV.pri; cls = wait ? " late" : " off"; html = wait ? "<i></i>Delayed · no live price yet" : ""; }
-      else if (age <= limit) { cls = " on"; html = `<i></i>Live · ${Math.floor(age / 1000)}s ago`; }
-      else if (now < LV.grace) { cls = " on"; html = "<i></i>Live · updating…"; }
-      else { cls = " late"; html = `<i></i>Delayed · ${Math.floor(age / 1000)}s ago`; }
+      if (age == null) { const late = now - LV.t0 > 15000 && LV.pri; cls = late ? " late" : ""; html = `<i></i>${late ? "Delayed" : "Live"} · ${clock}`; }
+      else if (age <= limit || now < LV.grace) { cls = " on"; html = `<i></i>Live · ${clock}`; }
+      else { cls = " late"; html = `<i></i>Delayed · ${clock}`; }
       if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
       el.className = "lvchip" + cls; el.title = cls === " on" ? "Prices from " + (LV.src || "DexScreener / Jupiter") + ", refreshed every few seconds" : "Live prices paused or slow: showing the desk's last published prices";
     });
