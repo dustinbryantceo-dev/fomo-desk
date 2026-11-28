@@ -1,13 +1,20 @@
 // sw.js - app shell for the home-screen app. Network first (a new deploy shows at once), cache as fallback.
 // Never caches the encrypted desk data (raw.githubusercontent.com): stale numbers must look stale.
-const CACHE = "desk-shell-v22-replay";
+const CACHE = "desk-shell-v23-tick";
 const SHELL = ["./", "index.html", "app.css", "app.js", "chart.js", "replay.js", "desk-crypto.js", "manifest.json", "icons/apple-touch-icon.png", "icons/icon-192.png", "rocket-logo.png", "rocket-real.png", "rocket-green.png", "rocket-red.png", "rocket-blue.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener("message", (e) => { if (e.data === "SKIP_WAITING") self.skipWaiting(); });
 self.addEventListener("fetch", (e) => {
   const u = new URL(e.request.url);
   if (u.origin !== location.origin || e.request.method !== "GET") return;
-  e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); caches.open(CACHE).then((x) => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
+  // Bypass the HTTP cache (GitHub Pages max-age=600) so a new deploy is what the phone actually gets.
+  // sw.js and ?ppver= probes are never cached: the app uses them to detect a newer shell.
+  const bust = u.pathname.endsWith("/sw.js") || u.searchParams.has("ppver");
+  e.respondWith(fetch(e.request, { cache: "no-store" }).then((r) => {
+    if (!bust && r.ok) { const c = r.clone(); caches.open(CACHE).then((x) => x.put(e.request, c)); }
+    return r;
+  }).catch(() => caches.match(e.request)));
 });
 // ---------- web push (the desk's outbox) ----------
 // Payload {title, body, event, tag, url "./?tab=..."}; no secrets, no desk data beyond the line itself.

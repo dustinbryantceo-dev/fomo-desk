@@ -36,6 +36,29 @@
   <div id="full" class="full" hidden></div>
   <div id="toast" class="toast" hidden></div>
 </div>
+<script>
+(function () {
+  var V = "desk-shell-v23-tick";
+  window.__PP_SHELL = V;
+  if (!("serviceWorker" in navigator) || location.protocol !== "https:") return;
+  var once = 0;
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    if (once++) return;
+    location.reload();
+  });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) {
+    if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
+    if (reg.update) reg.update();
+  }).catch(function () {});
+  fetch("sw.js?ppver=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (t) {
+    var m = t.match(/desk-shell-v[A-Za-z0-9-]+/);
+    if (m && m[0] !== V && sessionStorage.getItem("pp-sw") !== m[0]) {
+      sessionStorage.setItem("pp-sw", m[0]);
+      location.reload();
+    }
+  }).catch(function () {});
+})();
+</script>
 <script src="desk-crypto.js"></script>
 <script src="chart.js"></script>
 <script src="replay.js"></script>

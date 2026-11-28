@@ -186,9 +186,16 @@
     const t0 = Date.now();
     lvTick().finally(() => { clearTimeout(LV.timer); LV.timer = setTimeout(lvLoop, Math.max(300, LV_EVERY - (Date.now() - t0))); });
   }
+  let lvStarted = false;
   function lvStart() {
+    // iOS home-screen apps freeze JS when you leave; visibilitychange often does not fire on resume, but pageshow/focus do.
+    if (!lvStarted) {
+      lvStarted = true;
+      document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(LV.timer); else { LV.grace = Date.now() + 6000; lvLoop(); } });
+      addEventListener("pageshow", () => { LV.grace = Date.now() + 6000; lvLoop(); });
+      addEventListener("focus", () => { LV.grace = Date.now() + 6000; lvLoop(); });
+    }
     lvLoop();
-    document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(LV.timer); else { LV.grace = Date.now() + 6000; lvLoop(); } });
   }
   // the dot: "Live · 3s ago" ticking every second; "Delayed" only when no price request has succeeded for 10 s while we should be polling (not one slow answer)
   function lvChip() {
@@ -268,7 +275,13 @@
     if (el.textContent !== txt) el.textContent = txt; el.hidden = false;
   }
   function badgeTick() { const b = $("#mbadge"); if (b) { const h = modeBadge(); if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; } } }
-  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); maintRow(); lvPaint(); }, 1000);
+  let lvUiTimer = 0;
+  function lvUiTick() { offlineRow(); liveLabel(); badgeTick(); maintRow(); lvPaint(); }
+  function lvUiArm() { lvUiTick(); clearInterval(lvUiTimer); lvUiTimer = setInterval(lvUiTick, 1000); }
+  lvUiArm();   // start on load, do not wait for the first price or start()
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) lvUiArm(); });
+  addEventListener("pageshow", lvUiArm);
+  addEventListener("focus", lvUiArm);
 
   // ---------- views ----------
   function viewGate(kind) {
@@ -1787,7 +1800,14 @@
     if (window.__LIVE_TEST) lvStart();
     window.__ppFixtureStep = (nx) => { S.state = nx.state; for (const [k, v] of Object.entries(nx.files || {})) S.files[k] = v; fxDiff(S.state, S.files["activity/0"]); render(true); };
   }
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    const swCheck = () => navigator.serviceWorker.getRegistration().then((r) => { if (!r) return; r.update().catch(() => {}); if (r.waiting) r.waiting.postMessage("SKIP_WAITING"); }).catch(() => {});
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(() => swCheck()).catch(() => {});
+    addEventListener("pageshow", swCheck);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) swCheck(); });
+    setInterval(swCheck, 60000);
+  }
   addEventListener("resize", () => after());
+  lvStart();
   start();
 })();
