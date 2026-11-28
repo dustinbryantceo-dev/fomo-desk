@@ -236,3 +236,33 @@ html.tg{background:#000000}
 html.tg-fs .yo-fsbtn{color:var(--gold)}
 /* the notch / Telegram safe area: when the offline strip is hidden the view must still clear it (the old rule only did so while offline was shown) */
 .offline[hidden] + #view{padding-top:calc(var(--st) + 8px)}
+
+/* ---- v30 · Replay is a still picture: chart + markers + a plain list. No playback, no slow-mo, no effects. ---- */
+.rpv,.rpsumc,.rpstep,.rpwc,.rptr,.rpwin{animation:none!important}
+.rps-chart{position:relative;margin-top:12px;border-radius:var(--r-md);background:rgba(255,255,255,.02);border:1px solid var(--card-b);overflow:hidden}
+.rps-chart canvas{width:100%;display:block}
+.rps-read{display:flex;justify-content:space-between;gap:8px;margin:10px 4px 2px;font:600 13px var(--mono);color:var(--sec)}
+.rps-read b{font-weight:700}
+.rps-scrub{-webkit-appearance:none;appearance:none;width:100%;height:30px;margin:2px 0 0;background:transparent;touch-action:pan-y}
+.rps-scrub::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:rgba(226,195,141,.28)}
+.rps-scrub::-moz-range-track{height:4px;border-radius:2px;background:rgba(226,195,141,.28)}
+.rps-scrub::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-9px;border-radius:50%;background:#e2c38c;border:2px solid #0b0906}
+.rps-scrub::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#e2c38c;border:2px solid #0b0906}
+.rps-key{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:11.5px;color:var(--ter);margin:2px 4px 0}
+.rps-key .ky{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:-6px;background:#f7c967}
+.rps-key .ky.stop{background:#ff4d6d}.rps-key .ky.moon{background:#e2c38c}.rps-key .ky.ex{background:#ddb775}.rps-key .ky.tp{background:#f7cc6e}
+.rps-ev{display:flex;flex-direction:column;border-radius:var(--r-md);background:var(--c1);border:1px solid var(--card-b);overflow:hidden}
+.rps-row{display:grid;grid-template-columns:10px 62px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--sep)}
+.rps-row:first-child{border-top:0}
+.rps-row .dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.rps-row .tm{font:600 12px var(--mono);color:var(--ter)}
+.rps-row .tx b{display:block;font:600 15px/1.25 var(--font)}
+.rps-row .tx small{display:block;font-size:12px;color:var(--ter);margin-top:1px}
+.rps-row .rv b{font:700 15px var(--mono)}
+.rpsteps[hidden]{display:none}
+.rpsteps .rpstep .det,.rps-wl .rpwc .det,.rpwc .res{display:block}
+.rpsteps .rpstep{opacity:1}
+.rps-wl{display:flex;flex-direction:column;gap:8px}
+.rppad{height:40px}
+.rpmore.open span{display:inline-block;transform:rotate(180deg)}
+.rpwc,.rpstep{opacity:1}.rpwc .wgo{font-size:22px}

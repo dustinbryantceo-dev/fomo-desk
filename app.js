@@ -418,7 +418,7 @@
             <div><span>Open P&amp;L</span><b id="hpnl" class="${H.pnl >= 0 ? "up" : "down"}">${pos.length ? signedMoney(H.pnl) : "–"}</b></div>
           </div>
           <div class="chartbox"><canvas id="bchart"></canvas>${(!chart || (chart.points || []).length < 2) ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}
-            <button class="rpbtn" data-act="replay" aria-label="Replay trades">▶ Replay</button></div>
+            <button class="rpbtn" data-act="replay" aria-label="Replay trades">Replay</button></div>
           <div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>
           ${balTrades(chart)}
         </section>
@@ -428,6 +428,7 @@
           <h2 class="sec">Open positions <span class="count">· ${pos.length}</span></h2>
           ${S.demo ? `<div class="plist">${demoRow()}</div>` : ""}
           ${pos.length ? `<div class="plist">${pos.map(posCard).join("")}</div>` : S.demo ? "" : '<div class="empty glass"><b>No open positions</b>Risk is watching for the next entry.</div>'}
+          ${whyCard(pos.length)}
         </section>
         <section class="a-frame"${S.viewer ? " hidden" : ""}>
           <h2 class="sec">FOMO screen ${frameNote(scr)}</h2>
@@ -443,7 +444,7 @@
           </div>
         </section>
         <section class="a-trades">
-          <h2 class="sec">Recent trades<button class="more" data-act="replay">▶ Replay</button><button class="more" data-act="tab" data-tab="activity" style="margin-left:16px">See all</button></h2>
+          <h2 class="sec">Recent trades<button class="more" data-act="replay">Replay</button><button class="more" data-act="tab" data-tab="activity" style="margin-left:16px">See all</button></h2>
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
         <section class="a-xtr">${xTrendsCard()}</section>
@@ -598,6 +599,16 @@
     return `<div class="card" style="margin-bottom:12px" data-act="skips"><div class="grp" style="margin:0 0 4px">🔎 Skips · last hour ${s.mode === "starship" ? "· ✦ Starship rules" : ""}</div>${skipCounts(s.last_hour, 4)}
       <div class="row" style="min-height:40px"><div class="tx"><div class="t2">Tonight: ${s.tonight.reduce((a, r) => a + r.coins, 0)} skips · ${s.recent.length} recent coins</div></div><span class="ter">›</span></div></div>`;
   }
+  // Home: why the bots are not buying right now. Reads the skips file the desk already publishes (top reasons, last hour).
+  function whyCard(open) {
+    const s = S.files["skips"]; if (!s || !s.last_hour) return "";
+    const n = s.last_hour.reduce((a, r) => a + r.coins, 0), ix = ((S.files["replay/index"] || {}).trades) || [];
+    const last = ix.slice().sort((a, b) => b.t_open - a.t_open)[0], m = last ? Math.max(0, (Date.now() / 1000 - last.t_open) / 60) : null;
+    const ago = m == null ? "" : m < 60 ? Math.round(m) + " min ago" : m < 2880 ? (m / 60).toFixed(m < 600 ? 1 : 0) + " h ago" : Math.round(m / 1440) + " days ago";
+    return `<h2 class="sec">${open ? "Why not more" : "Why no trade"} <span class="count">· last hour</span></h2>
+      <div class="card glass whycard" data-act="skips">${n ? `<div class="t2" style="margin-bottom:2px">${n} coin${n === 1 ? "" : "s"} skipped. Top reasons:</div>${skipCounts(s.last_hour, 3)}` : '<div class="t2">No coins reached the filters in the last hour. Nothing to skip, nothing to buy.</div>'}
+        <div class="row" style="min-height:40px"><div class="tx"><div class="t2">${last ? `Last buy: ${esc(last.symbol || last.mint.slice(0, 4))} · ${ago}` : "No trades yet"}</div></div><span class="ter">All skips ›</span></div></div>`;
+  }
   function viewSkips() {
     const s = S.files["skips"];
     if (!s) return `<h1 class="title">Skips</h1>${s === undefined ? sk(200) : '<div class="empty"><b>No skip log yet</b>Every coin the bots look at but do not buy shows up here.</div>'}`;
@@ -688,9 +699,9 @@
     const row = (t) => { const up = t.pnl_usd >= 0, sy = t.symbol || String(t.mint || "").slice(0, 4);
       return `<button class="hbtr" data-act="rpid" data-id="${t.id}" aria-label="Replay ${esc(sy)}"><span class="ic" style="color:${up ? "#ff9752" : "#ff5c7a"}">${esc(sy.slice(0, 1))}</span>
         <span class="tx"><span class="t1">${esc(sy)}${t.starship ? ` <span class="tag ss">${STAR}</span>` : ""}</span><span class="t2">${trWhen.format(new Date(t.t_close * 1000))} · held ${trDur(t.t_close - t.t_open)}</span></span>
-        <span class="rv"><b class="${up ? "up" : "down"}">${trSigned(t.pnl_usd)}</b><small class="go">▶ Replay</small></span></button>`; };
+        <span class="rv"><b class="${up ? "up" : "down"}">${trSigned(t.pnl_usd)}</b><small class="go">Replay ›</small></span></button>`; };
     return `<div class="hbt">${head(all.length, net)}<div class="hbtl">${all.slice(0, 5).map(row).join("")}</div>
-      <div class="hbtf"><button data-act="replay">▶ Replay a whole night</button><button data-act="tab" data-tab="activity">${all.length > 5 ? `All ${all.length} trades ›` : "Trades tab ›"}</button></div></div>`;
+      <div class="hbtf"><button data-act="replay">See the whole night</button><button data-act="tab" data-tab="activity">${all.length > 5 ? `All ${all.length} trades ›` : "Trades tab ›"}</button></div></div>`;
   }
   function viewActivity() {
     const pages = []; for (let i = 0; i < 10 && S.files["activity/" + i]; i++) pages.push(S.files["activity/" + i]);
@@ -727,7 +738,7 @@
       <div class="btns">${fomoLink(c.link) ? `<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : ""}
         ${p && !S.viewer ? `<button class="btn red" data-act="sell" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Sell…</button>`
             : canCtl() && String(c.chain || "solana").toLowerCase() === "solana" ? `<button class="btn primary" data-act="buy" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Buy…</button>` : ""}</div>
-      <div class="btns" style="margin-top:8px"><button class="btn" data-act="audit" data-mint="${esc(mint)}">Audit</button>${hasReplay(mint) ? `<button class="btn" data-act="rptrade" data-mint="${esc(mint)}">▶ Replay trade</button>` : ""}${canCtl() ? `<button class="btn" data-act="why" data-mint="${esc(mint)}">Why? (Analyst)</button>` : ""}</div>
+      <div class="btns" style="margin-top:8px"><button class="btn" data-act="audit" data-mint="${esc(mint)}">Audit</button>${hasReplay(mint) ? `<button class="btn" data-act="rptrade" data-mint="${esc(mint)}">Replay trade</button>` : ""}${canCtl() ? `<button class="btn" data-act="why" data-mint="${esc(mint)}">Why? (Analyst)</button>` : ""}</div>
       <div id="whybox"></div>`;
   }
 
@@ -822,7 +833,7 @@
         <button class="row ssrow" data-act="starship" style="width:100%;text-align:left"><span class="ssico">${STAR}</span><div class="tx"><div class="t1">Starship Mode</div><div class="t2">${ssAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="window" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trading window &amp; buy timer</div><div class="t2">${winAccountLine()}</div></div><span class="ter">›</span></button>
         <button class="row" data-act="bots" style="width:100%;text-align:left"><div class="tx"><div class="t1">Pause / resume bots</div><div class="t2">${pausedNow().size ? "Paused: " + esc([...pausedNow()].join(", ")) : "All running"}</div></div><span class="ter">›</span></button>
-        <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite · copy traders on/off · withdraw</div></div><span class="ter">›</span></button>
+        <button class="row" data-act="social" style="width:100%;text-align:left"><div class="tx"><div class="t1">Social</div><div class="t2">Invite a friend · withdraw</div></div><span class="ter">›</span></button>
         <button class="row" data-act="report" style="width:100%;text-align:left"><div class="tx"><div class="t1">Morning report</div><div class="t2">Last night's Page</div></div><span class="ter">›</span></button>
       </div>` : ""}
       ${S.tg ? `<div class="grp">Home Screen</div>${tgHomeRow()}` : ""}
@@ -830,8 +841,7 @@
         <p>Yobel is Hebrew for Jubilee: the year debts were cancelled and people went free, announced with the blast of a ram's horn, the shofar. This desk is for the late-night, early-morning grinder making something out of nothing. When a trade closes in profit, the horn sounds.</p></div>
       <div class="grp">Sound</div><div class="list plain"><button class="row" data-act="yosound" style="width:100%;text-align:left"><div class="tx"><div class="t1">Shofar on a win</div><div class="t2">A soft horn when a trade closes in profit · off by default</div></div><span class="switch ${window.Yobel && Yobel.soundOn() ? "on" : ""}"></span></button></div>
       <div class="grp">Guide</div><div class="list plain"><button class="row" data-act="guide" style="width:100%;text-align:left"><div class="tx"><div class="t1">Yobel — how it works</div><div class="t2">The 5 bots, safety rules and Starship, in plain English</div></div><span class="ter">›</span></button></div>
-      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Replay effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
-      ${copyPicks(ac.copy_picks)}
+      <div class="grp">Effects</div><div class="list plain"><button class="row" data-act="fxdemo" style="width:100%;text-align:left"><div class="tx"><div class="t1">Trade effects</div><div class="t2">Preview buy, take profit, stop loss and exit on Home · no trade</div></div><span class="ter">›</span></button></div>
       <div class="grp">Notifications</div><div class="list plain">
         ${canCtl() ? `<button class="row" data-act="notif" style="width:100%;text-align:left"><div class="tx"><div class="t1">Notifications</div><div class="t2">Push to this phone · which events · quiet hours · Telegram alerts</div></div><span class="ter">›</span></button>`
           : `<div class="row"><div class="tx"><div class="t1">Notifications</div><div class="t2">Open your Yobel link with the control token to set up push</div></div></div>`}
@@ -841,26 +851,6 @@
       ${canCtl() ? "" : `<div class="grp" style="margin-top:28px">Settings · read-only without the control token; Telegram: "set stop to -20%"</div>
       ${["scanner", "analyst", "social", "brain", "executor", "risk", "desk", "browser"].filter((g) => groups[g]).map((g) => `<div class="grp" id="set-${g}">${esc(g[0].toUpperCase() + g.slice(1))}</div><div class="list plain">${groups[g].map(setRow).join("")}</div>`).join("")}`}
       <div class="ter" style="font-size:12px;text-align:center;margin:20px 0">Last update ${hm(S.lastIxT)} · ${esc(st ? st.mode : "")}${S.tg ? " · in Telegram" : ""}</div>`;
-  }
-
-  function copyPicks(cp) {
-    const k = (v) => (v == null ? "–" : (v < 0 ? "-$" : "+$") + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(1) + "M" : Math.abs(v) >= 1e3 ? (Math.abs(v) / 1e3).toFixed(1) + "k" : Math.abs(v).toFixed(0)));
-    const ago = (ts) => { if (!ts) return "–"; const m = (Date.now() / 1000 - ts) / 60; return m < 60 ? `${m.toFixed(0)}m ago` : m < 2880 ? `${(m / 60).toFixed(0)}h ago` : `${(m / 1440).toFixed(0)}d ago`; };
-    const head = `<div class="grp">Copy picks · ${cp && cp.every !== "off" ? `every ${esc(cp.every)} at ${esc(cp.time)}` : "off"}</div>`;
-    if (!cp || !cp.lists || !cp.lists.length) return head + `<div class="list plain"><div class="row"><div class="tx"><div class="t1">No list yet</div><div class="t2">off / every 24h / 12h / 6h + time · via Telegram</div></div></div></div>`;
-    const cur = cp.lists[0];
-    const card = (r) => `<div class="cp">
-        <div class="cp-top"><span class="cp-h">#${esc(r.rank)} ${esc(r.handle)}</span>${fomoLink(r.profile_link) ? `<a class="cp-btn" href="${esc(r.profile_link)}" target="_blank" rel="noopener noreferrer">Profile</a>` : ""}</div>
-        <div class="cp-n"><span class="up">7d ${esc(k(r.pnl_7d))}</span><span class="up">30d ${esc(k(r.pnl_30d))}</span><span class="mut">${esc(r.trades)} trades</span><span class="mut">last trade ${esc(ago(r.last_trade_ts))}</span></div>
-        ${r.last_buy_mint ? (fomoLink(r.coin_link) ? `<a class="cp-buy" href="${esc(r.coin_link)}" target="_blank" rel="noopener noreferrer">` : `<div class="cp-buy">`) + `<span>Last buy · ${esc(r.last_buy_symbol || r.last_buy_mint.slice(0, 6))}</span><span class="mut">${r.last_buy_mcap ? money(r.last_buy_mcap, 0) : "mcap n/a"}${r.last_buy_chain !== "solana" ? " · " + esc(r.last_buy_chain) : ""} ›</span>` + (fomoLink(r.coin_link) ? "</a>" : "</div>") : ""}
-        <div class="cp-why mut">${esc(r.why)}</div>
-        ${canCtl() && r.last_buy_mint && r.last_buy_chain === "solana" ? `<button class="btn sm" style="margin-top:8px" data-act="buy" data-mint="${esc(r.last_buy_mint)}" data-sym="${esc(r.last_buy_symbol || "")}">Buy ${esc(r.last_buy_symbol || "it")}…</button>` : ""}
-        <div class="cp-sw"><span>Copy on desk</span>${canCtl() ? `<button class="sw ${(copyIsOn(r.handle) ?? r.copy_on) ? "on" : ""} live" data-act="copysw" data-h="${esc(r.handle)}" aria-pressed="${!!(copyIsOn(r.handle) ?? r.copy_on)}" aria-label="Copy ${esc(r.handle)}"><i></i></button>` : `<span class="sw ${r.copy_on ? "on" : ""}" aria-disabled="true"><i></i></span>`}</div>
-      </div>`;
-    const hist = cp.lists.map((l) => `<div class="row"><div class="tx"><div class="t1">${esc(l.list_id)}</div><div class="t2">${l.rows.map((r) => esc(r.handle)).join(" · ")}</div></div></div>`).join("");
-    return head + `<div class="ter" style="font-size:12px;margin:0 0 8px">${esc(cur.list_id)} · newest on top</div>${cur.rows.map(card).join("")}
-      ${canCtl() ? `<div class="ro">Switch = /copy in Telegram: you confirm first, Telegram confirms after. <button class="linkbtn" data-act="social">What a switch does ›</button></div>` : roNote(`Copy on desk: 'copy on <handle>' (max ${esc(cp.max_on_copy)})`)}
-      <div class="grp">Last 7 lists</div><div class="list plain">${hist}</div>`;
   }
 
   // ---------- render ----------
@@ -883,7 +873,7 @@
     else if (top && top.kind === "starship") html = viewStarship();
     else if (top && top.kind === "skips") { ensure("skips"); html = viewSkips(); }
     else if (top && top.kind === "skip") { ensure("skips"); html = viewSkip(top.mint); }
-    else if (S.tab === "home") { ensure("x_trends"); html = viewHome(); }
+    else if (S.tab === "home") { ensure("x_trends"); ensure("skips"); html = viewHome(); }
     else if (S.tab === "bots") { BOT_ORDER.forEach((n) => ensure("bots/" + n)); ensure("skips"); html = viewBots(); }
     else if (S.tab === "activity") { ensure("skips"); ensure("replay/index"); html = S.files["replay/index"] === null ? viewActivity() : viewTrades(); }
     else if (S.tab === "account") { ensure("account"); ensure("settings"); html = viewAccount(); }
@@ -915,7 +905,7 @@
   }
 
   const VIEWER_BLOCK = new Set(["pushon", "pushoff", "pushtest", "evsw", "quietsw", "maintloud", "quietsave", "tgsw", "notif", "mode", "bots", "window", "starship", "settingsv", "setkey", "social",
-    "copysw", "buy", "sell", "why", "report", "sstoggle", "ssfor", "sscap", "wtimer", "wtoggle", "wsave", "wcancel", "wstopat", "invite", "pausebot", "confirm"]);
+    "buy", "sell", "why", "report", "sstoggle", "ssfor", "sscap", "wtimer", "wtoggle", "wsave", "wcancel", "wstopat", "invite", "pausebot", "confirm"]);
   // ---------- actions ----------
   document.addEventListener("click", async (e) => {
     const t = e.target.closest("[data-act]"); if (!t || e.target.closest("a")) return;
@@ -955,7 +945,6 @@
     else if (act === "settingsv") { push({ kind: "settings" }); loadSettings(true); }
     else if (act === "setkey") openSet(t.dataset.k);
     else if (act === "social") { push({ kind: "social" }); loadSocial(true); }
-    else if (act === "copysw") copySwitch(t.dataset.h);
     else if (act === "notif") { push({ kind: "notif" }); loadNotif(true); }
     else if (act === "vpush" && S.viewer) viewerPush();
     else if (act === "pushon") pushEnable();
@@ -1415,7 +1404,7 @@
   function viewSettings() {
     if (!S.setList) return backBar("Account") + `<h1 class="title">Settings</h1>` + (S.setErr ? `<div class="empty"><b>Can't load settings</b>${esc(S.setErr)}</div>` : sk(60) + sk(60) + sk(60));
     const groups = {}; S.setList.forEach((x) => (groups[x.group] = groups[x.group] || []).push(x));
-    const order = ["risk", "brain", "executor", "analyst", "scanner", "starship", "social", "desk", "copy_picks", "browser"];
+    const order = ["risk", "brain", "executor", "analyst", "scanner", "starship", "social", "desk", "browser"];
     return backBar("Account") + `<h1 class="title">Settings</h1><div class="ro">Same settings and limits as /set in Telegram. Every change asks you to confirm, lands in the change log and Telegram confirms it.</div>
       ${order.filter((g) => groups[g]).map((g) => `<div class="grp">${esc(g.replace("_", " "))}</div><div class="list plain">${groups[g].map((x) => `<button class="row" data-act="setkey" data-k="${esc(x.key)}" style="width:100%;text-align:left"><div class="tx"><div class="t1">${esc(x.alias || x.key.split(".")[1].replace(/_/g, " "))}</div><div class="t2">${esc(x.key)}${x.range ? " · " + esc(x.range) : ""}</div></div><span class="sv">${esc(showVal(x))}</span><span class="ter">›</span></button>`).join("")}</div>`).join("")}`;
   }
@@ -1442,51 +1431,15 @@
   // ---- Social: invite (links.py SIGNUP_URL from the desk), copy traders on/off (copy_on, same as /copy), withdraw note
   async function loadSocial(force) {
     if (S.social && !force) return;
-    const [inv, cl] = await Promise.all([api("/api/invite"), api("/api/copy_list")]);
-    S.social = { invite: inv.status === 200 ? ((inv.j.messages || [])[0] || {}).links || [] : null, copy: cl.status === 200 ? cl.j : null, err: cl.status === 200 ? null : apiErr(cl) };
+    const inv = await api("/api/invite");
+    S.social = { invite: inv.status === 200 ? ((inv.j.messages || [])[0] || {}).links || [] : null };
     render(true);
   }
-  function copyFacts() { return S.social && S.social.copy; }
-  function copyIsOn(h) { const f = copyFacts(); if (S.copyOpt && h in S.copyOpt) return S.copyOpt[h]; if (f && f.on_handles) return f.on_handles.includes(h); return null; }
-  function copyNote(f) {
-    if (!f) return "";
-    if (!f.copy_runs) return `<div class="p2note warn">Copy on desk isn't running in this desk process: switching a trader on is refused until it runs.</div>`;
-    return `<div class="p2note ${f.running_mode === "LIVE" ? "live" : ""}"><b>Switching a trader ON starts copy trades now</b> (${f.running_mode === "LIVE" ? "LIVE · real money" : "PAPER"}): their new buys go through the 8 layers, ${esc(f.size_pct)}% size, ${esc(f.stop_pct)}% own stop, max ${esc(f.max_on)} traders.
-      ${f.lists_every === "off" ? "Copy picks lists are OFF (copy_picks.every = off): that only stops new picks lists; it doesn't stop copying the traders you switch on." : `New picks lists: every ${esc(f.lists_every)}.`}</div>`;
-  }
   function viewSocial() {
-    const so = S.social, cp = S.files.account && S.files.account.copy_picks, f = copyFacts();
-    const traders = cp && cp.lists && cp.lists[0] ? cp.lists[0].rows : [];
-    const inv = so && so.invite && so.invite[0];
+    const so = S.social, inv = so && so.invite && so.invite[0];
     return backBar("Account") + `<h1 class="title">Social</h1>
       <div class="grp">Invite</div><div class="list plain"><div class="row"><div class="tx"><div class="t1">Invite a friend to FOMO</div><div class="t2">${inv ? esc(inv.url.replace(/^https:\/\//, "")) : so ? "–" : "loading…"}</div></div>${inv ? `<button class="btn sm primary" data-act="p2invite">Share</button>` : ""}</div></div>
-      <div class="grp">Copy on desk</div>${so ? (f ? copyNote(f) : `<div class="p2note warn">${esc(so.err || "")}</div>`) : sk(70)}
-      <div class="list plain">${traders.length ? traders.map((r) => { const on = copyIsOn(r.handle) ?? r.copy_on;
-        return `<div class="row"><div class="tx"><div class="t1">${esc(r.handle)}</div><div class="t2">#${esc(r.rank)} on today's list${f && f.on_handles.includes(r.handle) ? " · copying" : ""}</div></div><button class="sw ${on ? "on" : ""} live" data-act="copysw" data-h="${esc(r.handle)}" aria-pressed="${!!on}" aria-label="Copy ${esc(r.handle)}"><i></i></button></div>`; }).join("")
-        : `<div class="row"><div class="tx"><div class="t1">No copy picks list yet</div><div class="t2">Traders show up here when a list exists</div></div></div>`}</div>
-      ${f && f.on_handles.length ? `<div class="ro">Copying now: ${f.on_handles.map(esc).join(", ")}</div>` : ""}
       <div class="grp">Withdraw</div><div class="list plain"><div class="row"><div class="tx"><div class="t1">Withdraw in FOMO yourself</div><div class="t2">The desk never withdraws. Open FOMO and withdraw there.</div></div></div></div>`;
-  }
-  // optimistic switch: flips at once, rolls back on cancel, refusal or error; the desk's copy_on table is the truth
-  async function copySwitch(h) {
-    if (!canCtl()) return toast("No control token on this device");
-    if (!S.social) await loadSocial();
-    const was = !!(copyIsOn(h) ?? false), want = !was;
-    S.copyOpt = Object.assign(S.copyOpt || {}, { [h]: want }); render(true);
-    const rollback = (msg) => { delete S.copyOpt[h]; render(true); if (msg) toast(msg); };
-    const f = copyFacts();
-    const sh = sheet(`<div class="p2t">Copy ${esc(h)}: ${want ? "ON" : "OFF"}</div>${want ? copyNote(f) : ""}<div class="ro p2msg" id="p2msg" data-k="busy">Asking the desk…</div>
-      <button class="btn dis" id="p2go" style="width:100%;margin-top:12px" disabled>…</button>`);
-    let settled = false; sh.onclose = () => { if (!settled) rollback(); };
-    const r = await api("/api/copy", { handle: h, on: want });
-    const p = r.status === 200 && r.j.proposal;
-    if (!p) { settled = true; rollback(); const g = $("#p2go"); if (g) g.textContent = "Not switched"; return setMsg(r.status === 200 ? apiText(r.j) : apiErr(r), "err"); }
-    setMsg(apiText(r.j), "");
-    confirmStep(p.pid, want ? (p.mode === "LIVE" ? "Confirm: copy with real money" : "Confirm copy ON") : "Confirm copy OFF", want && p.mode === "LIVE" ? "red" : "primary", (j, ok) => {
-      settled = true;
-      if (ok && j.applied) { S.social.copy = Object.assign(S.social.copy || {}, j); delete S.copyOpt[h]; render(true); }
-      else rollback(ok ? "The desk didn't switch it (see the message)" : "Not switched");
-    });
   }
   function setv(key) { const g = (S.files.settings || {}).groups || {}; for (const rows of Object.values(g)) for (const r of rows) if (r.key === key) return r.value; return null; }
   function curMode() { return (S.ctl.s && S.ctl.st === "ok" && S.ctl.s.mode) || (S.files.account && S.files.account.mode) || (S.state && S.state.mode); }
