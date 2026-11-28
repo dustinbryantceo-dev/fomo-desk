@@ -984,16 +984,48 @@
     if (navigator.share) { try { await navigator.share({ title: "FOMO", url: u }); return; } catch (e) { if (e.name === "AbortError") return; } }
     try { await navigator.clipboard.writeText(u); toast("Link copied"); } catch { toast(u); }
   }
+  // Search: coins the desk saw (instant, from the published data) + LIVE SEARCH (2026-11-15): any Solana mint or ticker
+  // through the desk's /api/lookup (DexScreener, cached 30 s). Read only: no Buy button here, search never buys.
   function openSearch() {
     const box = $("#searchbox"); if (!box) return;
-    box.innerHTML = `<div class="search">${ICON.search}<input id="q" placeholder="Name, symbol or mint" autocomplete="off" autocapitalize="off" spellcheck="false"></div><div id="qres"></div>`;
-    const q = $("#q"); q.focus();
-    q.addEventListener("input", () => {
-      const s = q.value.trim().toLowerCase(), rows = ((S.files.coins || {}).rows || []);
+    box.innerHTML = `<div class="search">${ICON.search}<input id="q" placeholder="Name, ticker ($GTA6) or any mint" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></div><div id="qres"></div><div id="qlive"></div>`;
+    const q = $("#q"); q.focus(); let tm = null, seq = 0;
+    const local = () => {
+      const s = q.value.trim().toLowerCase().replace(/^\$/, ""), rows = ((S.files.coins || {}).rows || []);
       const hit = s ? rows.filter((r) => (r.mint || "").toLowerCase() === s || (r.symbol || "").toLowerCase().includes(s) || (r.name || "").toLowerCase().includes(s)).slice(0, 8) : [];
-      $("#qres").innerHTML = !s ? "" : hit.length ? `<div class="list" style="margin-bottom:12px">${hit.map((r) => `<div class="row" data-act="coin" data-mint="${esc(r.mint)}"><div class="ic">${sym(r.symbol, r.mint).slice(0, 1)}</div><div class="tx"><div class="t1">${esc(r.name || r.symbol)}</div><div class="t2">${sym(r.symbol, r.mint)} · ${esc(r.mint.slice(0, 6))}…</div></div><div class="rv">${fomoA(r.link)}</div></div>`).join("")}</div>`
-        : `<div class="empty" style="margin-bottom:12px">No coin the desk saw tonight matches "${esc(q.value)}"</div>`;
-    });
+      $("#qres").innerHTML = !s ? "" : hit.length ? `<div class="grp">Seen by the desk</div><div class="list" style="margin-bottom:12px">${hit.map((r) => `<div class="row" data-act="coin" data-mint="${esc(r.mint)}"><div class="ic">${sym(r.symbol, r.mint).slice(0, 1)}</div><div class="tx"><div class="t1">${esc(r.name || r.symbol)}</div><div class="t2">${sym(r.symbol, r.mint)} · ${esc(r.mint.slice(0, 6))}…${r.source ? " · via " + esc(r.source) : ""}</div></div><div class="rv">${fomoA(r.link)}</div></div>`).join("")}</div>`
+        : canCtl() ? "" : `<div class="empty" style="margin-bottom:12px">No coin the desk saw tonight matches "${esc(q.value)}"</div>`;
+    };
+    const live = async () => {
+      const v = q.value.trim(), my = ++seq, el = $("#qlive"); if (!el) return;
+      if (!canCtl() || v.length < 2) { el.innerHTML = ""; return; }
+      el.innerHTML = `<div class="grp">All of Solana</div>${sk(56)}${sk(56)}`;
+      const r = await api("/api/lookup", { q: v }, 15000); if (my !== seq || !$("#qlive")) return;
+      $("#qlive").innerHTML = lookupHtml(r, v);
+    };
+    q.addEventListener("input", () => { local(); clearTimeout(tm); tm = setTimeout(live, 650); });
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter") { clearTimeout(tm); live(); } });
+  }
+  const usdS = (v) => v == null ? "–" : v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? "$" + (v / 1e3).toFixed(1) + "K" : v >= 1 ? "$" + Math.round(v) : "$" + Number(v).toPrecision(3);
+  const ageS = (m) => m == null ? "–" : m < 120 ? Math.round(m) + "m" : m < 2880 ? Math.round(m / 60) + "h" : Math.round(m / 1440) + "d";
+  function deskVerdict(d) {
+    if (!d) return `<span class="lkv mut">desk: never seen</span>`;
+    if (d.rug) return `<span class="lkv bad">⛔ rug list: desk never buys it</span>`;
+    const b = []; if (d.scan) b.push(`Scanner ${esc(d.scan)}${d.reason ? " (" + esc(d.reason) + ")" : ""}`);
+    if (d.score != null) b.push(`score ${esc(d.score)}${d.score_pass ? " ✓" : ""}`); if (d.source) b.push("via " + esc(d.source));
+    return `<span class="lkv ${d.scan === "pass" ? "ok" : d.scan === "kill" ? "bad" : ""}">desk: ${b.length ? b.join(" · ") : "seen"}</span>`;
+  }
+  function lookupHtml(r, v) {
+    if (r.status !== 200 || !r.j.ok) return `<div class="grp">All of Solana</div><div class="empty" style="margin-bottom:12px">${esc((r.j && r.j.message) || apiErr(r))}</div>`;
+    const rows = r.j.results || [];
+    if (!rows.length) return `<div class="grp">All of Solana</div><div class="empty" style="margin-bottom:12px">No Solana coin on DexScreener matches "${esc(v)}"</div>`;
+    const known = new Set(((S.files.coins || {}).rows || []).map((x) => x.mint));
+    return `<div class="grp">All of Solana <span class="ter">· DexScreener · by liquidity × volume · search never buys</span></div><div class="list lklist" style="margin-bottom:12px">${rows.map((x) => `
+      <div class="row lkrow" ${known.has(x.mint) ? `data-act="coin" data-mint="${esc(x.mint)}"` : ""}><div class="ic">${sym(x.symbol, x.mint).slice(0, 1)}</div>
+        <div class="tx"><div class="t1">${esc(x.symbol || "?")} <span class="mut">${esc(x.name || "")}</span>${x.copycat ? ` <span class="tag sell">COPYCAT?</span>` : x.copies ? ` <span class="tag tp">${esc(x.copies)} copycat${x.copies === 1 ? "" : "s"}</span>` : ""}${x.thin ? ` <span class="tag sell">THIN</span>` : ""}</div>
+          <div class="t2">${esc(x.mint.slice(0, 6))}…${esc(x.mint.slice(-4))} · ${usdS(x.price_usd)} · liq ${usdS(x.liquidity_usd)} · vol ${usdS(x.volume_h24)} · ${ageS(x.pool_age_min)}</div>
+          <div class="t2">${esc((x.dex || []).join(", ") || "-")}${x.launcher && x.launcher !== "-" ? " · " + esc(x.launcher) : ""} · ${deskVerdict(x.desk)}</div></div>
+        <div class="rv">${fomoA(x.link)}</div></div>`).join("")}</div>`;
   }
   // ---------- PAPER / LIVE switch sheet ----------
   // Control endpoint on the desk (Caddy :443 -> 127.0.0.1). Phase 1 only: GET /api/status, POST /api/mode.

@@ -73,7 +73,7 @@ li b{color:#ffffff}
 </ul></div></details>
 
 <details><summary><span class="ico"><svg viewBox="0 0 24 24"><path d="M5 5v14h14"/><path d="m8.5 14.5 3-3.5 2.5 2 4.5-5.5"/></svg></span><span>Protecting your money<small>Stops that sell for you</small></span><span class="chev">⌄</span></summary><div class="body"><ul>
-<li><b>Stop:</b> if a coin falls <span class="n">12%</span> from the buy price, Risk sells.</li>
+<li><b>Stop:</b> if a coin falls <span class="n">12%</span> from the buy price, Risk sells. In the first <span class="n">30 s</span> after a buy, that stop waits in case the drop is just noise, but a fall of <span class="n">25%</span> still sells immediately.</li>
 <li><b>Break-even:</b> once a coin is up <span class="n">20%</span>, the stop moves up to your buy price. A win can no longer turn into a loss.</li>
 <li><b>Locking in:</b> once a coin is up <span class="n">30%</span>, the stop rises so you keep at least <span class="n">+10%</span>. At <span class="n">+40%</span> you keep at least <span class="n">+18%</span>.</li>
 <li><b>Going nowhere:</b> after <span class="n">3 h</span> with less than <span class="n">5%</span> gain, it sells and moves on.</li>
@@ -83,7 +83,7 @@ li b{color:#ffffff}
 <details><summary><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 10c0-1.1 1-1.8 2.5-1.8s2.5.7 2.5 1.8-1 1.5-2.5 1.9-2.5.8-2.5 1.9 1 1.8 2.5 1.8 2.5-.7 2.5-1.8"/></svg></span><span>Taking profit<small>How wins are locked in</small></span><span class="chev">⌄</span></summary><div class="body"><ul>
 <li><b>Take profit:</b> when the price doubles (<span class="n">2x</span>), it sells half.</li>
 <li><b>Trailing stop:</b> the rest follows the price up, and sells if the price falls <span class="n">40%</span> from its highest point.</li>
-<li><b>Moonbag:</b> if a coin is up <span class="n">60%</span> (<span class="n">1.6x</span>) within <span class="n">10 min</span> and buyers keep coming, Yobel keeps <span class="n">20%</span> of the coins for a possible big run.</li>
+<li><b>Moonbag:</b> if a coin is up <span class="n">50%</span> (<span class="n">1.5x</span>) within <span class="n">20 min</span> and buyers keep coming, Yobel keeps <span class="n">20%</span> of the coins for a possible big run.</li>
 <li>The moonbag is never sold early by the normal trail.</li>
 </ul></div></details>
 
@@ -103,7 +103,7 @@ li b{color:#ffffff}
 </ul></div></details>
 
 <details><summary><span class="ico"><svg viewBox="0 0 24 24"><rect x="6.5" y="3" width="11" height="18" rx="3"/><path d="M10.5 18h3"/></svg></span><span>Using the app<small>Where to tap</small></span><span class="chev">⌄</span></summary><div class="body"><ul>
-<li><b>Home:</b> your balance, open trades, the FOMO screen (the trading app Yobel uses) and coins trending on X.</li>
+<li><b>Home:</b> your balance, open trades, the FOMO screen (the trading app Yobel uses) and coins trending on X. Search can also look up any Solana mint or ticker (it never buys from search).</li>
 <li><b>The ▲ / ▼ number under your balance</b> is how much it changed since <b>10:00 PM</b>, when Yobel's night starts. Gold is up, red is down.</li>
 <li><b>Trades behind your balance:</b> tap any finished trade on Home to replay it.</li>
 <li><b>Trades:</b> only finished trades, with Wins and Losses filters. Biggest results first.</li>
