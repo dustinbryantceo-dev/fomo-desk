@@ -92,7 +92,7 @@ h2.sec .count{color:var(--sec);font-weight:400}
 .carousel .bot{scroll-snap-align:start;flex:none;width:76%;min-height:170px}
 .bot .head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px}
 .bot .sdot{width:8px;height:8px;border-radius:50%;background:#8e8e93;flex:none}
-.bot .sdot.running{background:var(--green)} .bot .sdot.stale{background:var(--orange)} .bot .sdot.off{background:#48484a}
+.bot .sdot.running{background:var(--green)} .bot .sdot.stale{background:var(--orange)} .bot .sdot.degraded{background:var(--orange)} .bot .sdot.off{background:#48484a}
 .bot .big{font:600 22px/1.2 var(--disp);margin:8px 0 6px}
 .bot .line{font-size:14px;color:var(--sec);margin:3px 0;display:flex;gap:6px;align-items:center;min-width:0}
 .bot .line .r{margin-left:auto;white-space:nowrap}
@@ -275,9 +275,10 @@ body::before{content:"";position:fixed;inset:-20vh -20vw;z-index:-1;pointer-even
 .bchip.ok .light{background:var(--green);box-shadow:0 0 10px var(--green);animation:breathe 2.4s ease-in-out infinite}
 .bchip.paused .light{background:var(--orange);box-shadow:0 0 8px var(--orange)}
 .bchip.stale .light{background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 1s infinite}
+.bchip.degraded .light{background:var(--orange);box-shadow:0 0 8px var(--orange);animation:blink 1.6s infinite}
 .bchip .bn{font-size:12px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bchip .bs{font-size:10px;color:var(--ter);text-transform:uppercase;letter-spacing:.6px}
-.bchip.ok .bs{color:rgba(0,245,160,.8)}.bchip.paused .bs{color:var(--orange)}.bchip.stale .bs{color:var(--red)}
+.bchip.ok .bs{color:rgba(0,245,160,.8)}.bchip.paused .bs{color:var(--orange)}.bchip.stale .bs{color:var(--red)}.bchip.degraded .bs{color:var(--orange)}
 @keyframes breathe{50%{box-shadow:0 0 3px var(--green);opacity:.75}}
 
 /* positions: glowing rows */
