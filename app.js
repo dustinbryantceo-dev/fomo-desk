@@ -40,7 +40,7 @@
       S.ix = ix; S.state = ix.state; S.lastIxT = ix.t; S.lastOk = Date.now(); S.err = null;
       try { localStorage.setItem("desk.last", JSON.stringify({ t: ix.t, state: ix.state })); } catch {}
       if (Date.now() / 1000 - ix.t > STALE_S) S.err = "stale";
-      await Promise.allSettled(["chart/" + S.range, "activity/0", "coins", "x_trends"].map(getFile));
+      await Promise.allSettled(["chart/" + S.range, "activity/0", "coins", "x_trends", "replay/index"].map(getFile));
       try { fxDiff(ix.state, S.files["activity/0"]); } catch {}
       if (ix.files.screen && ix.files.screen !== S.screenVer) loadScreen(ix.files.screen);
     } catch (e) { S.err = e.status === 404 || /no index/.test(e.message) ? "nodata" : "offline"; }
@@ -78,10 +78,13 @@
   }
 
 
-  // ---------- live prices (MEM-20): public DexScreener, computed on this phone; the desk's own exit logic is untouched ----------
-  const DEXQ = "https://api.dexscreener.com/tokens/v1/solana/", JUPQ = "https://lite-api.jup.ag/price/v3?ids=";
-  const LV_EVERY = 2500, LV_FRESH = 12000, LV_FRESH_OTHER = 25000, LV_OTHER_EVERY = 9000, LV_JUP_EVERY = 10000, MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-  const LV = { px: {}, hi: {}, last: 0, fails: 0, busy: false, timer: null, jupAt: 0, src: "" };
+  // ---------- live prices (MEM-20): public price APIs, computed on this phone; the desk's own exit logic is untouched ----------
+  // Jupiter's price API moves every ~2 s (DexScreener's origin only every 10-30 s), so Jupiter is the fast lane for the open positions and
+  // DexScreener (the desk's own source: biggest pumpswap pool) is the reference, asked every 5 s on alternating endpoints with a unique
+  // cache-buster so the 30 s edge cache never serves an old answer. Jupiter is used only while it agrees with DexScreener within 15%.
+  const DEXQ = ["https://api.dexscreener.com/tokens/v1/solana/", "https://api.dexscreener.com/latest/dex/tokens/"], JUPQ = "https://lite-api.jup.ag/price/v3?ids=";
+  const LV_EVERY = 2500, LV_FRESH = 15000, LV_FRESH_OTHER = 25000, LV_DEX_EVERY = 5000, LV_OTHER_EVERY = 9000, LV_LATE = 10000, MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  const LV = { px: {}, dex: {}, hi: {}, last: 0, okAt: 0, busy: false, timer: null, dexAt: 0, dexSkip: 0, dexFails: 0, jupSkip: 0, jupFails: 0, ep: 0, src: "", pri: false, grace: 0, t0: Date.now() };
   const lvQ = (m, max = LV_FRESH) => { const q = LV.px[m]; return q && Date.now() - q.t < max ? q : null; };
   // value / P&L / stop distance for one open position: live price when we have a fresh one, the published numbers otherwise
   function posLive(p) {
@@ -110,7 +113,7 @@
     const q = lvQ(c.mint || (S.stack[S.stack.length - 1] || {}).mint), price = q ? q.price : c.price, p = c.position;
     return { price, live: !!q, since: p && p.entry_price && price ? 100 * (price / p.entry_price - 1) : null };
   }
-  const xLive = (m) => { const q = lvQ(m, LV_FRESH_OTHER); return q ? `${priceFmt(q.price)}${q.h1 != null ? " · 1h " + pct(q.h1, 0) : ""}` : ""; };
+  const xLive = (m) => { const q = lvQ(m, LV_FRESH_OTHER); const h = q && (q.h1 != null ? q.h1 : (LV.dex[m] || {}).h1); return q ? `${priceFmt(q.price)}${h != null ? " · 1h " + pct(h, 0) : ""}` : ""; };
   function tradeLive(r) {
     if (r.kind !== "bought") return "";
     const p = ((S.state && S.state.positions) || []).find((x) => x.mint === r.mint && Math.abs((x.opened_at || 0) - r.ts) < 300); if (!p) return "";
@@ -123,62 +126,81 @@
     if (S.tab === "home" && !S.stack.length) (((S.files["x_trends"] || {}).rows) || []).slice(0, 20).forEach((r) => add(oth, r.mint));
     return { pri, oth };
   }
+  async function lvFetch(url, ms = 4000) {
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms);
+    try {
+      const r = await fetch(url, { mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal });
+      if (!r.ok) throw Object.assign(new Error("http " + r.status), { status: r.status });
+      return await r.json();
+    } finally { clearTimeout(tm); }
+  }
   async function lvDex(mints) {
     const out = {}, chunks = [];
     for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+    const ep = LV.ep; LV.ep = (LV.ep + 1) % DEXQ.length;           // alternate the two DexScreener endpoints; if one refuses, try the other right away
     await Promise.all(chunks.map(async (ch) => {
-      const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 4000);
-      try {
-        const r = await fetch(DEXQ + ch.join(",") + "?_=" + Math.floor(Date.now() / 2000), { mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal });
-        if (!r.ok) throw new Error("dex " + r.status);
-        const best = {}, other = {};
-        for (const pr of (await r.json()) || []) {                 // same pick as the desk: the biggest pumpswap pool, else the biggest pool of any dex
-          const m = pr && pr.baseToken && pr.baseToken.address, px = +pr.priceUsd; if (!ch.includes(m) || !(px > 0)) continue;
-          const liq = (pr.liquidity && pr.liquidity.usd) || 0, tgt = pr.dexId === "pumpswap" ? best : other;
-          if (!tgt[m] || liq > tgt[m].liq) tgt[m] = { price: px, liq, h1: pr.priceChange && pr.priceChange.h1 != null ? +pr.priceChange.h1 : null };
-        }
-        for (const m of Object.keys(other)) if (!best[m]) best[m] = other[m];
-        Object.assign(out, best);
-      } finally { clearTimeout(tm); }
+      let j; const bust = "?_=" + Date.now() + Math.floor(Math.random() * 1000);
+      try { j = await lvFetch(DEXQ[ep] + ch.join(",") + bust); } catch (e) { j = await lvFetch(DEXQ[(ep + 1) % DEXQ.length] + ch.join(",") + bust); }
+      const best = {}, other = {};
+      for (const pr of Array.isArray(j) ? j : (j && j.pairs) || []) {   // same pick as the desk: the biggest pumpswap pool, else the biggest pool of any dex
+        const m = pr && pr.baseToken && pr.baseToken.address, px = +pr.priceUsd; if (!ch.includes(m) || !(px > 0)) continue;
+        const liq = (pr.liquidity && pr.liquidity.usd) || 0, tgt = pr.dexId === "pumpswap" ? best : other;
+        if (!tgt[m] || liq > tgt[m].liq) tgt[m] = { price: px, liq, h1: pr.priceChange && pr.priceChange.h1 != null ? +pr.priceChange.h1 : null };
+      }
+      for (const m of Object.keys(other)) if (!best[m]) best[m] = other[m];
+      Object.assign(out, best);
     }));
     return out;
   }
-  async function lvJup(mints) {       // fallback for held coins DexScreener didn't answer for (the free endpoint is rate limited: at most every 10 s)
-    if (!mints.length || Date.now() - LV.jupAt < LV_JUP_EVERY) return {};
-    LV.jupAt = Date.now(); const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 4000), out = {};
-    try {
-      const r = await fetch(JUPQ + mints.slice(0, 50).join(","), { mode: "cors", cache: "no-store", credentials: "omit", referrerPolicy: "no-referrer", signal: ac.signal });
-      if (r.ok) { const j = await r.json(); for (const m of mints) { const px = j && j[m] && +j[m].usdPrice; if (px > 0) out[m] = { price: px, h1: null }; } }
-    } catch {} finally { clearTimeout(tm); }
+  async function lvJup(mints) {
+    const out = {}, j = await lvFetch(JUPQ + mints.slice(0, 50).join(","));
+    for (const m of mints) { const px = j && j[m] && +j[m].usdPrice; if (px > 0) out[m] = { price: px }; }
     return out;
   }
   async function lvTick() {
     if (LV.busy || document.hidden || !S.state || !S.dp) return;
-    const { pri, oth } = lvMints(), now = Date.now();
-    const due = pri.concat(oth.filter((m) => !LV.px[m] || now - LV.px[m].t >= LV_OTHER_EVERY));
-    if (!due.length) return;
-    LV.busy = true;
+    const { pri, oth } = lvMints(), now = Date.now(); LV.pri = pri.length > 0;
+    const dexMints = pri.concat(oth.filter((m) => !LV.dex[m] || now - LV.dex[m].t >= LV_OTHER_EVERY));
+    const dexDue = dexMints.length && now >= LV.dexSkip && now - LV.dexAt >= (pri.length ? LV_DEX_EVERY : LV_OTHER_EVERY), jupDue = pri.length && now >= LV.jupSkip;
+    if (!dexDue && !jupDue) return;
+    LV.busy = true; let jup = {};
     try {
-      const got = await lvDex(due); let src = "DexScreener";
-      const miss = pri.filter((m) => !got[m] && !lvQ(m)); if (miss.length) { const j = await lvJup(miss); if (Object.keys(j).length) { Object.assign(got, j); src = "Jupiter"; } }
-      const t = Date.now(); for (const m of Object.keys(got)) LV.px[m] = Object.assign({ t }, got[m]);
-      if (Object.keys(got).length) { LV.last = t; LV.src = src; }
-      LV.fails = 0;
-    } catch { LV.fails++; }
-    LV.busy = false; lvPaint();
+      const jobs = [];
+      if (dexDue) { LV.dexAt = now; jobs.push(lvDex(dexMints).then((g) => { const t = Date.now(); LV.dexFails = 0; LV.okAt = t; for (const m of Object.keys(g)) LV.dex[m] = Object.assign({ t }, g[m]); },
+        () => { LV.dexSkip = Date.now() + Math.min(10000, 2500 * 2 ** Math.min(3, LV.dexFails++)); })); }
+      if (jupDue) jobs.push(lvJup(pri).then((g) => { LV.jupFails = 0; LV.okAt = Date.now(); jup = g; },
+        () => { LV.jupSkip = Date.now() + Math.min(10000, 2500 * 2 ** Math.min(3, LV.jupFails++)); }));
+      await Promise.all(jobs);
+      const t = Date.now();
+      for (const m of pri.concat(oth)) {
+        const d = LV.dex[m] && t - LV.dex[m].t < 30000 ? LV.dex[m] : null, j = jup[m];
+        if (j && (!d || Math.abs(j.price / d.price - 1) < 0.15)) { LV.px[m] = { price: j.price, h1: d ? d.h1 : null, t }; LV.last = t; LV.src = "Jupiter"; }
+        else if (d) { LV.px[m] = { price: d.price, h1: d.h1, t: d.t }; LV.last = Math.max(LV.last, d.t); LV.src = "DexScreener"; }
+      }
+    } catch {} finally { LV.busy = false; }
+    lvPaint();
   }
   function lvLoop() {
     clearTimeout(LV.timer);
     if (document.hidden) return;                        // tab hidden: no polling at all
-    lvTick().finally(() => { clearTimeout(LV.timer); LV.timer = setTimeout(lvLoop, Math.min(15000, LV_EVERY * 2 ** Math.min(LV.fails, 3))); });
+    const t0 = Date.now();
+    lvTick().finally(() => { clearTimeout(LV.timer); LV.timer = setTimeout(lvLoop, Math.max(300, LV_EVERY - (Date.now() - t0))); });
   }
-  function lvStart() { lvLoop(); document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(LV.timer); else lvLoop(); }); }
+  function lvStart() {
+    lvLoop();
+    document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(LV.timer); else { LV.grace = Date.now() + 6000; lvLoop(); } });
+  }
+  // the dot: "Live · 3s ago" ticking every second; "Delayed" only when no price request has succeeded for 10 s while we should be polling (not one slow answer)
   function lvChip() {
-    const age = Date.now() - LV.last, live = LV.last && age < 10000;
+    const now = Date.now(), age = LV.okAt ? now - LV.okAt : null, limit = LV.pri ? LV_LATE : 16000;
     document.querySelectorAll("[data-lvchip]").forEach((el) => {
-      const html = !LV.last ? "" : live ? `<i></i>Live · ${hms(LV.last / 1000)}` : `<i></i>Delayed · ${hms(LV.last / 1000)}`;
+      let cls, html;
+      if (age == null) { const wait = now - LV.t0 > 15000 && LV.pri; cls = wait ? " late" : " off"; html = wait ? "<i></i>Delayed · no live price yet" : ""; }
+      else if (age <= limit) { cls = " on"; html = `<i></i>Live · ${Math.floor(age / 1000)}s ago`; }
+      else if (now < LV.grace) { cls = " on"; html = "<i></i>Live · updating…"; }
+      else { cls = " late"; html = `<i></i>Delayed · ${Math.floor(age / 1000)}s ago`; }
       if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
-      el.className = "lvchip" + (!LV.last ? " off" : live ? " on" : " late"); el.title = live ? "Prices from " + LV.src + ", updated every few seconds" : "Live prices paused or slow: showing the desk's last published prices";
+      el.className = "lvchip" + cls; el.title = cls === " on" ? "Prices from " + (LV.src || "DexScreener / Jupiter") + ", refreshed every few seconds" : "Live prices paused or slow: showing the desk's last published prices";
     });
   }
   function lvPaint() {
@@ -207,7 +229,7 @@
     const moved = tab !== S.tab || S.stack.length; S.tab = tab; S.stack = []; document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab)); render(); scrollTo(0, 0); if (moved) slideIn(); }
   function slideIn() { const v = $("#view"); if (!v || reduce()) return; v.classList.remove("vin"); void v.offsetWidth; v.classList.add("vin"); clearTimeout(slideIn.t); slideIn.t = setTimeout(() => v.classList.remove("vin"), 320); }
   function push(view) { S.stack.push(view); history.pushState({ d: S.stack.length }, ""); render(); scrollTo(0, 0); slideIn(); }
-  addEventListener("popstate", () => { if (S.stack.length) { S.stack.pop(); render(); } });
+  addEventListener("popstate", () => { if (document.getElementById("rpv")) return; if (S.stack.length) { S.stack.pop(); render(); } });
   document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => go(b.dataset.tab)));
 
   // ---------- shared pieces ----------
@@ -246,7 +268,7 @@
     if (el.textContent !== txt) el.textContent = txt; el.hidden = false;
   }
   function badgeTick() { const b = $("#mbadge"); if (b) { const h = modeBadge(); if (b.dataset.h !== h) { b.innerHTML = h; b.dataset.h = h; } } }
-  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); maintRow(); if (LV.last) lvPaint(); }, 1000);
+  setInterval(() => { offlineRow(); liveLabel(); badgeTick(); maintRow(); lvPaint(); }, 1000);
 
   // ---------- views ----------
   function viewGate(kind) {
@@ -340,7 +362,7 @@
       </header>
       <div id="searchbox"></div>
       <div class="home">
-        <section class="hero glass${S.rp ? " replaying" : ""}" id="hero">
+        <section class="hero glass" id="hero">
           <div class="hlab">Total balance <span class="ter">· ${esc(st.balance_source || "")}</span><span class="lvchip off" data-lvchip></span></div>
           <div class="balance"><span id="bal" class="tw"></span></div>
           <div class="hrow">
@@ -352,10 +374,9 @@
             <div><span>Positions</span><b id="hpos">${pos.length ? money(H.val) : "$0.00"}</b></div>
             <div><span>Open P&amp;L</span><b id="hpnl" class="${H.pnl >= 0 ? "up" : "down"}">${pos.length ? signedMoney(H.pnl) : "–"}</b></div>
           </div>
-          <div class="chartbox"><canvas id="bchart"></canvas>${!S.rp && (!chart || (chart.points || []).length < 2) ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}
-            ${S.rp ? `<span class="rpbadge"><i></i>REPLAY <small>${esc(S.rp.range)} · ${S.rp.speed}x</small></span>` : `<button class="rpbtn" data-act="replay" aria-label="Replay this range">▶ Play</button>`}
-            ${!S.rp && S.rpMsg > Date.now() ? '<div class="rpempty">Nothing to replay in this range</div>' : ""}</div>
-          ${S.rp ? rpControls() : `<div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>`}
+          <div class="chartbox"><canvas id="bchart"></canvas>${(!chart || (chart.points || []).length < 2) ? `<div class="chartnote">${chart ? "Waiting for the first trade" : ""}</div>` : ""}
+            <button class="rpbtn" data-act="replay" aria-label="Replay trades">▶ Replay</button></div>
+          <div class="ranges">${["LIVE", "1H", "4H", "1D", "1W", "ALL"].map((r) => `<button data-act="range" data-r="${r}" class="${r === S.range ? "on" : ""}">${r}</button>`).join("")}</div>
         </section>
         <section class="a-bots">${botStrip()}</section>
         <section class="a-pos">
@@ -378,7 +399,7 @@
           </div>
         </section>
         <section class="a-trades">
-          <h2 class="sec">Recent trades<button class="more" data-act="tab" data-tab="activity">See all</button></h2>
+          <h2 class="sec">Recent trades<button class="more" data-act="replay">▶ Replay</button><button class="more" data-act="tab" data-tab="activity" style="margin-left:16px">See all</button></h2>
           ${trades.length ? `<div class="tlist glass">${trades.slice(0, 8).map(tradeRow).join("")}</div>` : '<div class="empty glass"><b>Waiting for the first trade</b>Scanner and Analyst are working; trades show up here.</div>'}
         </section>
         <section class="a-xtr">${xTrendsCard()}</section>
@@ -727,7 +748,7 @@
       <div class="btns">${fomoLink(c.link) ? `<a class="btn" href="${esc(c.link)}" target="_blank" rel="noopener noreferrer">Open on FOMO</a>` : ""}
         ${p && !S.viewer ? `<button class="btn red" data-act="sell" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Sell…</button>`
             : canCtl() && String(c.chain || "solana").toLowerCase() === "solana" ? `<button class="btn primary" data-act="buy" data-mint="${esc(mint)}" data-sym="${esc(c.symbol || "")}">Buy…</button>` : ""}</div>
-      <div class="btns" style="margin-top:8px"><button class="btn" data-act="audit" data-mint="${esc(mint)}">Audit</button>${canCtl() ? `<button class="btn" data-act="why" data-mint="${esc(mint)}">Why? (Analyst)</button>` : ""}</div>
+      <div class="btns" style="margin-top:8px"><button class="btn" data-act="audit" data-mint="${esc(mint)}">Audit</button>${hasReplay(mint) ? `<button class="btn" data-act="rptrade" data-mint="${esc(mint)}">▶ Replay trade</button>` : ""}${canCtl() ? `<button class="btn" data-act="why" data-mint="${esc(mint)}">Why? (Analyst)</button>` : ""}</div>
       <div id="whybox"></div>`;
   }
 
@@ -903,7 +924,7 @@
     const bal = $("#bal");
     if (bal && S.state) tween(bal, heroLive(S.state).bal);
     lvChip();
-    const bc = $("#bchart"); if (bc) { if (S.rp) rpDraw(); else { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; } }
+    const bc = $("#bchart"); if (bc) { const ch = S.files["chart/" + S.range]; Charts.line(bc, ch, prevChart); prevChart = ch; }
     const top = S.stack[S.stack.length - 1];
     const cc = $("#cchart"); if (cc && top) { const c = S.files["coin/" + top.mint]; if (c) Charts.candles(cc, c.candles, c.exit_line, c.position && c.position.entry_price); }
     document.querySelectorAll(".disc .d").forEach((d) => requestAnimationFrame(() => d.classList.add(d.dataset.st)));
@@ -966,10 +987,8 @@
     else if (act === "closesheet") closeSheet();
     else if (act === "fxdemo") fxDemo();
     else if (act === "mode") openMode(t.dataset.m);
-    else if (act === "replay") rpStart();
-    else if (act === "rpplay") rpToggle();
-    else if (act === "rpexit") rpExit();
-    else if (act === "rpspeed") { if (S.rp) { S.rp.speed = +t.dataset.s; render(); } }
+    else if (act === "replay") Replay.open();
+    else if (act === "rptrade") Replay.open({ mint: t.dataset.mint });
     else if (act === "guide") openGuide();
   });
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 1800); }
@@ -1526,75 +1545,9 @@
     document.body.appendChild(d);
   }
 
-  // ---------- balance replay: plays the trades of the selected range on the chart with their rocket effects ----------
-  // Local only: reads activity pages that are already published (no writes, nothing sent to the desk), runs on rAF, the 15 s poll is untouched.
-  const RP_WIN = { LIVE: 3600, "1H": 3600, "4H": 4 * 3600, "1D": 86400, "1W": 7 * 86400 }, RP_1X = 24;   // whole range in 24 s at 1x
-  const SPEEDS = [0.5, 1, 2, 4, 8];
-  const rowKind = (r) => r.kind === "bought" ? "buy" : r.kind === "stopped" ? "stop" : r.kind === "sold" ? (isTP(r) ? "tp" : "sell") : null;
-  const rpWhen = (ts, span) => new Date(ts * 1000).toLocaleString([], span > 86400 ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  function rpControls() {
-    const r = S.rp, n = r.events.filter((e) => e.fired).length;
-    return `<div class="rpctl"><button class="rb" data-act="rpplay" id="rpPlay">${r.done ? "↻ Again" : r.playing ? "❚❚ Pause" : "▶ Play"}</button><button class="rb exit" data-act="rpexit">■ Exit</button>
-      <div class="spd" role="group" aria-label="Speed">${SPEEDS.map((x) => `<button data-act="rpspeed" data-s="${x}" class="${x === r.speed ? "on" : ""}">${x}x</button>`).join("")}</div></div>
-      <div class="rpinfo"><span id="rpTime">${esc(rpWhen(r.pos, r.t1 - r.t0))}</span><span id="rpCount"><b>${n}</b> of ${r.events.length} trades · not live</span></div>`;
-  }
-  async function rpStart() {
-    if (S.rp || !S.state) return;
-    const range = S.range, chart = S.files["chart/" + range], pts = (chart && chart.points) || [], now = Date.now() / 1000;
-    let t0 = pts.length >= 2 ? pts[0][0] : range === "ALL" ? null : now - RP_WIN[range], t1 = pts.length >= 2 ? pts[pts.length - 1][0] : now;
-    for (let i = 0; i < 10; i++) {                       // published activity pages, newest first; stop once we are older than the range
-      if (!S.files["activity/" + i]) { if (!S.ix || !S.ix.files["activity/" + i]) break; try { await getFile("activity/" + i); } catch { break; } }
-      const rows = (S.files["activity/" + i] || {}).rows || []; if (!rows.length || (t0 != null && rows[rows.length - 1].ts < t0)) break;
-    }
-    const rows = []; for (let i = 0; i < 10 && S.files["activity/" + i]; i++) rows.push(...(S.files["activity/" + i].rows || []));
-    let ev = rows.map((r) => ({ r, kind: rowKind(r) })).filter((x) => x.kind && x.r.ts);
-    if (t0 == null) t0 = ev.length ? Math.min(...ev.map((x) => x.r.ts)) - 60 : now - 86400;
-    ev = ev.filter((x) => x.r.ts >= t0 && x.r.ts <= t1).sort((a, b) => a.r.ts - b.r.ts)
-      .map(({ r, kind }) => ({ ts: r.ts, kind, mint: r.mint, id: r.id, sym: (r.title || "").split(" ").slice(1).join(" ") || (r.mint || "").slice(0, 4), value: String(r.value || "").split(" · ")[0] }));
-    if (!ev.length || t1 - t0 < 1) { S.rpMsg = Date.now() + 2600; render(); setTimeout(() => { if (!S.rp) render(); }, 2700); return; }
-    S.rp = { range, chart, t0, t1, events: ev, pos: t0, speed: 1, playing: true, done: false, last: 0 };
-    render(); rpLoop();
-  }
-  function rpLoop() {
-    const r = S.rp; if (!r || r.raf) return;
-    const step = (now) => {
-      r.raf = 0; if (S.rp !== r) return;
-      if (S.tab !== "home" || S.stack.length) { rpExit(); return; }
-      if (r.playing) {
-        const dt = r.last ? Math.min(0.1, (now - r.last) / 1000) : 0; r.last = now;
-        r.pos = Math.min(r.t1, r.pos + dt * (r.t1 - r.t0) / RP_1X * r.speed);
-        let n = 0; for (const e of r.events) if (!e.fired && e.ts <= r.pos) { e.fired = true; if (n++ < 2) rpFire(e); }   // at 8x skip the pile-up, never queue
-        if (r.pos >= r.t1) { r.playing = false; r.done = true; render(); return; }
-      }
-      rpDraw();
-      const tEl = $("#rpTime"); if (tEl) tEl.textContent = rpWhen(r.pos, r.t1 - r.t0);
-      const cEl = $("#rpCount b"); if (cEl) cEl.textContent = r.events.filter((e) => e.fired).length;
-      if (r.playing) r.raf = requestAnimationFrame(step);
-    };
-    r.last = 0; r.raf = requestAnimationFrame(step);
-  }
-  function rpDraw() { const r = S.rp, bc = $("#bchart"); if (r && bc) Charts.line(bc, r.chart, null, { upto: r.pos, t0: r.t0, t1: r.t1, events: r.events }); }
-  function rpToggle() {
-    const r = S.rp; if (!r) return;
-    if (r.done) { r.events.forEach((e) => (e.fired = false)); r.pos = r.t0; r.done = false; r.playing = true; }
-    else r.playing = !r.playing;
-    render(); if (r.playing) rpLoop();
-  }
-  function rpExit() { const r = S.rp; if (!r) return; if (r.raf) cancelAnimationFrame(r.raf); S.rp = null; render(); }
-  function rpFire(e) {
-    const bc = $("#bchart"), hero = $("#hero"); if (!bc) return;
-    const cr = bc.getBoundingClientRect(), pts = (S.rp.chart && S.rp.chart.points) || [], pad = pts.length >= 2 ? 16 : 22;
-    const x = cr.left + pad + (cr.width - 2 * pad) * ((e.ts - S.rp.t0) / (S.rp.t1 - S.rp.t0 || 1)), y = cr.top + cr.height * 0.55;
-    const anchor = { getBoundingClientRect: () => e.kind === "tp" ? { left: x - 50, top: y - 100, width: 100, height: 130 } : { left: x, top: y - 10, width: 0, height: 20 } };
-    if (hero) { hero.classList.remove("fx-buy", "fx-tp", "fx-stop", "fx-sell"); void hero.offsetWidth; hero.classList.add("fx-" + e.kind); setTimeout(() => hero.classList.remove("fx-" + e.kind), 1600); }
-    const lab = { buy: "Bought", tp: "Take profit", stop: "Stopped out", sell: "Exit" }[e.kind];
-    const el = document.createElement("div"); el.className = "ppban replay " + e.kind;
-    el.innerHTML = `<em>REPLAY</em><b>${esc(lab)}</b> ${esc(e.sym)}${e.value ? ` <span>${esc(e.value)}</span>` : ""}`;
-    document.querySelectorAll(".ppban.replay").forEach((b) => b.remove());
-    document.body.appendChild(el); setTimeout(() => el.classList.add("out"), 1500); setTimeout(() => el.remove(), 2100);
-    if (!reduce()) { const shake = () => { const v = $("#view"); if (v) { v.classList.remove("pp-shake"); void v.offsetWidth; v.classList.add("pp-shake"); setTimeout(() => v.classList.remove("pp-shake"), 600); } };
-      arcade(e.kind, anchor, e.kind === "stop" ? shake : null); }
-  }
+  // ---------- replay: the player lives in replay.js (MEM-22) ----------
+  const hasReplay = (m) => (((S.files["replay/index"] || {}).trades) || []).some((t) => t.mint === m);
+  Replay.init({ S, getFile, openCoin: (m) => { go("home"); push({ kind: "coin", mint: m }); } });
 
   // ---------- guide: guide.html from the same site in a full-screen view (Close returns to the app) ----------
   function openGuide() {
